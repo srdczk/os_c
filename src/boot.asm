@@ -81,5 +81,4 @@ outstr16   db '0000', 0  ;register value string
 reg16   dw    0  ; pass values to printreg16
 msg   db "What are you doing, Dave?", 0
 times 510-($-$$) db 0
-db 0x55
-db 0xAA
+dw 0xaa55
