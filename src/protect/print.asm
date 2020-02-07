@@ -1,7 +1,6 @@
 [bits 32]
 
 VIDEO_MEMORY equ 0xb8000
-; color
 RED_ON_BLACK equ 0x0c
 
 print_string_pm:
