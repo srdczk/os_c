@@ -1,28 +1,32 @@
+[ORG 0x7c00]
+    mov bp, 0x9000 ; set stack
+    mov sp, bp
+    
+    mov bx, MSG_REAL
+    call print
+
+    call switch_to_pm
+
+    jmp $ ;never executed
+
+%include "src/real/print.asm"
+%include "src/protect/gdt.asm"
+%include "src/protect/print.asm"
+%include "src/protect/switch.asm"
+
+; enter the ptotected mode
 [bits 32]
-;print string directly to video memory
-; 0xb8000 + 2 * (row * 80 + col)
-VIDEO_MEMORY equ 0xb8000
-WHITE_ON_BLACK equ 0x0f
+begin_pm:
+    mov ebx, MSG_PROT
+    call print_string_pm
+    jmp $
 
-print_string_pm
-    pusha
-    mov edx, VIDEO_MEMORY
+; 实模式 显示:
+MSG_REAL:
+    db "REALP", 0
+MSG_PROT:
+    db "KOBED", 0
 
-print_string_pm_loop:
-    mov al, [ebx]
-    mov ah, WHITE_ON_BLACK
-
-    cmp al, 0
-    je done
-
-    mov [edx], ax ; al 存进[edx] -> 显存 + 2 --> 列数 + 2
-
-    add ebx, 1
-    add edx, 2
-
-    jmp print_string_pm_loop
-done:
-    popa
-    ret
-; should init GDT and enter protected mode
+    times 510 - ($ - $$) db 0
+    dw 0xaa55
 
