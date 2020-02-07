@@ -1,19 +1,19 @@
 disk_load:
     pusha
-    ; 保存所有寄存器
     push dx
 
-    ; bios int0x13 中断
+    ; 读取到内存中的地址 ---> 存放在bx 中
     mov ah, 0x02
+    ; 读取的扇区数
     mov al, dh
-    ; 读入的扇区号
-    mov cl, 0x02
-    ; 柱面号 以及磁头号
+    ; 开始读取的扇区编号
+    mov cl, 0x02 
     mov ch, 0x00
+    
     mov dh, 0x00
 
     int 0x13
-    jc disk_error ;if error
+    jc disk_error
 
     pop dx
     cmp al, dh
@@ -24,16 +24,18 @@ disk_load:
 disk_error:
     mov bx, DISK_ERROR
     call print
+    call print_nl
     jmp disk_loop
 
 sectors_error:
     mov bx, SECTORS_ERROR
     call print
+    call print_nl
 
 disk_loop:
     jmp disk_loop
 
 DISK_ERROR:
-    db "Disk error", 0
+    db "DISK ERROR", 0
 SECTORS_ERROR:
-    db "Sectors error", 0
+    db "SECTORS ERROR", 0

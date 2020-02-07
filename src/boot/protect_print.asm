@@ -1,16 +1,16 @@
 [bits 32]
 
 VIDEO_MEMORY equ 0xb8000
-RED_ON_BLACK equ 0x0c
+RED_COLOR equ 0x0c
 
 print_string_pm:
     pusha
-    mov edx, VIDEO_MEMORY
+    mov edx,VIDEO_MEMORY
+
 
 print_string_pm_loop:
     mov al, [ebx]
-    mov ah, RED_ON_BLACK
-
+    mov ah, RED_COLOR
     cmp al, 0
     je print_string_pm_done
 

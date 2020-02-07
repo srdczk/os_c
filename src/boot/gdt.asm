@@ -18,16 +18,14 @@ gdt_data:
     db 10010010b
     db 11001111b
     db 0x0
-    
+
 gdt_end:
 
 gdt_descriptor:
-    ; 16 bits gdt len
     dw gdt_end - gdt_start - 1
-    ; 32 bits gdt begin addr
     dd gdt_start
 
+; 段选择子
 CODE_SEG equ gdt_code - gdt_start
-    
 DATA_SEG equ gdt_data - gdt_start
-
+    
