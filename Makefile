@@ -4,13 +4,16 @@ run: os.img
 os.img: boot.bin kernel.bin
 	@cat $^ > $@
 
-kernel.bin: kernel_entry.o kernel.o port.o
+kernel.bin: kernel_entry.o kernel.o port.o screen.o
 	@i686-elf-ld -o $@ -Ttext 0x1000 $^ --oformat binary
 
 boot.bin: src/boot/boot.asm
 	@nasm $< -f bin -o $@
 
 port.o: src/driver/port.c
+	@i686-elf-gcc -g -ffreestanding -c $< -o $@
+
+screen.o: src/driver/screen.c
 	@i686-elf-gcc -g -ffreestanding -c $< -o $@
 
 kernel.o: src/kernel/kernel.c
