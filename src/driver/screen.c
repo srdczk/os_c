@@ -1,93 +1,92 @@
 #include "screen.h"
-#include "port.h"
-
-// 光标位置
-int get_cursor_offset();
-
-void set_cursor_offset(int offset);
-
-int print_char(char c, int col, int row, char attr);
-
-int get_offset(int c, int r);
-
-int get_offset_row(int offset);
-
-int get_offset_col(int offset);
-
-void kprint_at(char *msg, int c, int r) {
-    int offset;
-    if (c >= 0 && r >= 0) offset = get_offset(c, r);
-    else {
-        offset = get_cursor_offset();
-        r = get_offset_row(offset);
-        c = get_offset_col(offset);
-    }
-    int i = 0;
-    while (msg[i] != 0) {
-        offset = print_char(msg[i++], c, r, WHITE_ON_BLACK);
-        r = get_offset_row(offset);
-        c = get_offset_col(offset);
-    }
-}
 
 void kprint(char *msg) {
-    kprint_at(msg, -1, -1);
+    int i = 0;
+    int cursor = get_cursor_offset();
+    while (msg[i]) {
+        cursor = print_at(msg[i++], cursor, 0x0f);
+    }
 }
 
-int print_char(char c, int col, int row, char attr) {
-    char *vm = (char *)VIDEO_ADDRESS;
-    if (!attr) attr = WHITE_ON_BLACK;
-    if (col >= MAX_COLS || row >= MAX_ROWS) {
-        vm[2 * (MAX_COLS) * (MAX_ROWS) - 2] = 'E';
-        vm[2 * (MAX_COLS) * (MAX_ROWS) - 1] = RED_ON_WHITE;
-        return get_offset(col, row);
+int print_at(char x, int cursor, char color) {
+    char *vga = (char *)0xb8000;
+    int i;
+    while (cursor >= 2 * MAX_ROW * MAX_COL) {
+        // 1 - 25 行全部复制到前面去, 清空 最后一行
+        for (i = 1; i < MAX_ROW; ++i) {
+            memcpy(vga + 2 * (i * MAX_COL), vga + 2 * ((i - 1) * MAX_COL), 2 * MAX_COL);
+        }
+        clear_last_line();
+        cursor -= 2 * MAX_COL;
     }
-
-    int offset;
-    if (col >= 0 && row >= 0) offset = get_offset(col, row);
-    else offset = get_cursor_offset();
-
-    if (c == '\n') {
-        row = get_offset_row(offset);
-        // row 行, col  列
-        offset = get_offset(0, row + 1);
+    int r = get_row(cursor), c = get_col(cursor);
+    vga[cursor] = x == '\n' ? ' ' : x;
+    vga[cursor + 1] = color;
+    if (x == '\n') {
+        if (r == MAX_ROW - 1) {
+            for (i = 1; i < MAX_ROW; ++i) {
+                memcpy(vga + 2 * (i * MAX_COL), vga + 2 * ((i - 1) * MAX_COL), 2 * MAX_COL);
+            }
+            clear_last_line();
+            set_cursor_offset(get_offset(MAX_ROW - 1, c));
+            return get_offset(MAX_ROW - 1, c);
+        } else {
+            set_cursor_offset(get_offset(r + 1, c));
+            return get_offset(r + 1, c);
+        }
     } else {
-        vm[offset] = c;
-        vm[offset + 1] = attr;
-        offset += 2;
+        set_cursor_offset(cursor + 2);
+        return cursor + 2;
     }
-    set_cursor_offset(offset);
-    return offset;
 }
 
 int get_cursor_offset() {
-    port_byte_out(REG_SCREEN_CTRL, 14);
-    int offset = port_byte_in(REG_SCREEN_DATA) << 8;
-    port_byte_out(REG_SCREEN_CTRL, 15);
-    offset += port_byte_in(REG_SCREEN_DATA);
+    port_byte_out(CURSOR_CTRL, 14);
+    int offset = port_byte_in(CURSOR_DATA) << 8;
+    port_byte_out(CURSOR_CTRL, 15);
+    offset += port_byte_in(CURSOR_DATA);
     return 2 * offset;
 }
 
 void set_cursor_offset(int offset) {
     offset /= 2;
-    port_byte_out(REG_SCREEN_CTRL, 14);
-    port_byte_out(REG_SCREEN_DATA, (unsigned char) (offset >> 8));
-    port_byte_out(REG_SCREEN_CTRL, 15);
-    port_byte_out(REG_SCREEN_DATA, (unsigned char) (offset & 0xff));
+    port_byte_out(CURSOR_CTRL, 14);
+    port_byte_out(CURSOR_DATA, (unsigned char)(offset >> 8));
+    port_byte_out(CURSOR_CTRL, 15);
+    port_byte_out(CURSOR_DATA, (unsigned char)(offset & 0xff));
 }
 
+int get_offset(int r, int c) {
+    return 2 * (MAX_COL * r + c);
+}
 void clear_screen() {
-    int screen_size = MAX_COLS * MAX_ROWS;
-    int i = 0;
-    char *vm = (char *)VIDEO_ADDRESS;
-    for (i = 0; i < screen_size; ++i) {
-        vm[2 * i] = ' ';
-        vm[2 * i + 1] = WHITE_ON_BLACK;
+    int i;
+    char *vga = (char *)0xb8000;
+    for (i = 0; i < 2 * MAX_COL * MAX_ROW; i += 2) {
+        vga[i] = ' ';
+        vga[i + 1] = 0x0f;
     }
-
-    set_cursor_offset(get_offset(0, 0));
+    set_cursor_offset(0);
+}
+void clear_last_line() {
+    char *begin = (char *)(0xb8000 + 2 * (MAX_COL * (MAX_ROW - 1)));
+    int i;
+    for (i = 0; i < MAX_COL * 2; i += 2) {
+        begin[i] = ' ';
+        begin[i + 1] = 0x0f;
+    }
+}
+int get_row(int offset) {
+    return (offset / 2) / MAX_COL;
+}
+int get_col(int offset) {
+    return (offset - get_row(offset) * 2 * MAX_COL) / 2;
 }
 
-int get_offset(int c, int r) { return 2 * (r * MAX_COLS + c);  }
-int get_offset_row(int offset) { return offset / (2 * MAX_COLS); }
-int get_offset_col(int offset) { return (offset - 2 * get_offset_row(offset) * MAX_COLS)/ 2; }
+void memcpy(char *src, char *des, int len) {
+    int i;
+    for (i = 0; i < len; ++i) {
+        *(des + i) = *(src + i);
+    }
+}
+
