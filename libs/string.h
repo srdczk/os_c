@@ -1,4 +1,5 @@
-#include "port.h"
+#pragma once
+#include "x86.h"
 
 #define CURSOR_DATA 0x3d5
 #define CURSOR_CTRL 0x3d4
@@ -16,4 +17,7 @@ void clear_last_line();
 int get_row(int offset);
 int get_col(int offset);
 void memcpy(char *src, char *des, int len);
+void swap(char *s, int i, int j);
+void int_to_string(int i, char s[]);
+
 

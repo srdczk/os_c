@@ -4,22 +4,32 @@ run: os.img
 os.img: boot.bin kernel.bin
 	@cat $^ > $@
 
-kernel.bin: kernel_entry.o kernel.o port.o screen.o
-	@i686-elf-ld -o $@ -Ttext 0x1000 $^ --oformat binary
+kernel.bin: kernel_entry.o kernel.o x86.o string.o idt.o isr.o interrupt.o
+	@i686-elf-ld -o $@ -Ttext 0x9000 $^ --oformat binary
 
-boot.bin: src/boot/boot.asm
+boot.bin: boot/boot.asm
 	@nasm $< -f bin -o $@
 
-port.o: src/driver/port.c
+x86.o: libs/x86.c
 	@i686-elf-gcc -g -ffreestanding -c $< -o $@
 
-screen.o: src/driver/screen.c
+string.o: libs/string.c
 	@i686-elf-gcc -g -ffreestanding -c $< -o $@
 
-kernel.o: src/kernel/kernel.c
+idt.o: trap/idt.c
+	@i686-elf-gcc -g -ffreestanding -c $< -o $@
+
+isr.o: trap/isr.c
+	@i686-elf-gcc -g -ffreestanding -c $< -o $@
+
+kernel.o: kernel/kernel.c
 	 @i686-elf-gcc -g -ffreestanding -c $< -o $@
 
-kernel_entry.o: src/boot/kernel_entry.asm
+
+kernel_entry.o: boot/kernel_entry.asm
+	@nasm $< -f elf -o $@
+
+interrupt.o: trap/interrupt.asm
 	@nasm $< -f elf -o $@
 	
 clean:

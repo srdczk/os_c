@@ -1,6 +1,6 @@
 [org 0x7c00]
 
-load_addr equ 0x1000
+load_addr equ 0x9000
 
 ; bios set dl -> boot_drive
 
@@ -48,7 +48,7 @@ begin_pm:
     mov es, ax
     mov fs, ax
     mov gs, ax
-    mov esp, 0x90000
+    mov esp, 0x9000
     mov ebp, esp
     call load_addr
     jmp $

@@ -1,4 +1,4 @@
-#include "screen.h"
+#include "string.h"
 
 void kprint(char *msg) {
     int i = 0;
@@ -28,11 +28,11 @@ int print_at(char x, int cursor, char color) {
                 memcpy(vga + 2 * (i * MAX_COL), vga + 2 * ((i - 1) * MAX_COL), 2 * MAX_COL);
             }
             clear_last_line();
-            set_cursor_offset(get_offset(MAX_ROW - 1, c));
-            return get_offset(MAX_ROW - 1, c);
+            set_cursor_offset(get_offset(MAX_ROW - 1, 0));
+            return get_offset(MAX_ROW - 1, 0);
         } else {
-            set_cursor_offset(get_offset(r + 1, c));
-            return get_offset(r + 1, c);
+            set_cursor_offset(get_offset(r + 1, 0));
+            return get_offset(r + 1, 0);
         }
     } else {
         set_cursor_offset(cursor + 2);
@@ -41,19 +41,19 @@ int print_at(char x, int cursor, char color) {
 }
 
 int get_cursor_offset() {
-    port_byte_out(CURSOR_CTRL, 14);
-    int offset = port_byte_in(CURSOR_DATA) << 8;
-    port_byte_out(CURSOR_CTRL, 15);
-    offset += port_byte_in(CURSOR_DATA);
+    outb(CURSOR_CTRL, 14);
+    int offset = inb(CURSOR_DATA) << 8;
+    outb(CURSOR_CTRL, 15);
+    offset += inb(CURSOR_DATA);
     return 2 * offset;
 }
 
 void set_cursor_offset(int offset) {
     offset /= 2;
-    port_byte_out(CURSOR_CTRL, 14);
-    port_byte_out(CURSOR_DATA, (unsigned char)(offset >> 8));
-    port_byte_out(CURSOR_CTRL, 15);
-    port_byte_out(CURSOR_DATA, (unsigned char)(offset & 0xff));
+    outb(CURSOR_CTRL, 14);
+    outb(CURSOR_DATA, (unsigned char)(offset >> 8));
+    outb(CURSOR_CTRL, 15);
+    outb(CURSOR_DATA, (unsigned char)(offset & 0xff));
 }
 
 int get_offset(int r, int c) {
@@ -90,3 +90,21 @@ void memcpy(char *src, char *des, int len) {
     }
 }
 
+void swap(char *s, int i, int j) {
+    char c = s[i];
+    s[i] = s[j];
+    s[j] = c;
+}
+
+void int_to_string(int i, char s[]) {
+    int cnt = 0;
+    while (i) {
+        s[cnt++] = (char)(i % 10 + '0');
+        i /= 10;
+    }
+    s[cnt] = '\0';
+    int k;
+    for (k = 0; k < cnt / 2; ++k) {
+        swap(s, k, cnt - 1 - k);
+    }
+}
