@@ -1,5 +1,5 @@
 [extern isr_handler]
-
+[extern irq_handler]
 isr_common_stub:
 	pusha ; 
 	mov ax, ds ; 
@@ -9,8 +9,8 @@ isr_common_stub:
 	mov es, ax
 	mov fs, ax
 	mov gs, ax
-    
-	call isr_handler
+
+    call isr_handler
 
 	pop eax
 	mov ds, ax
@@ -22,6 +22,25 @@ isr_common_stub:
 	sti
 	iret ; pops 5 things at once: CS, EIP, EFLAGS, SS, and ESP
 
+irq_common_stub:
+    pusha 
+    mov ax, ds
+    push eax
+    mov ax, 0x10
+    mov ds, ax
+    mov es, ax
+    mov fs, ax
+    mov gs, ax
+    call irq_handler 
+    pop ebx  ; Different than the ISR code
+    mov ds, bx
+    mov es, bx
+    mov fs, bx
+    mov gs, bx
+    popa
+    add esp, 8
+    sti
+    iret 
 
 global isr0
 global isr1
@@ -56,14 +75,28 @@ global isr29
 global isr30
 global isr31
 
-; 0: Divide By Zero Exception
+global irq0
+global irq1
+global irq2
+global irq3
+global irq4
+global irq5
+global irq6
+global irq7
+global irq8
+global irq10
+global irq11
+global irq12
+global irq13
+global irq14
+global irq15
+
 isr0:
     cli
     push byte 0
     push byte 0
     jmp isr_common_stub
 
-; 1: Debug Exception
 isr1:
     cli
     push byte 0
@@ -274,37 +307,108 @@ isr31:
     push byte 31
     jmp isr_common_stub
 
+irq0:
+    cli
+    push byte 0
+    push byte 32
+    jmp irq_common_stub
+
+irq1:
+	cli
+	push byte 1
+	push byte 33
+	jmp irq_common_stub
+
+irq2:
+	cli
+	push byte 2
+	push byte 34
+	jmp irq_common_stub
+
+irq3:
+	cli
+	push byte 3
+	push byte 35
+	jmp irq_common_stub
+
+irq4:
+	cli
+	push byte 4
+	push byte 36
+	jmp irq_common_stub
+
+irq5:
+	cli
+	push byte 5
+	push byte 37
+	jmp irq_common_stub
+
+irq6:
+	cli
+	push byte 6
+	push byte 38
+	jmp irq_common_stub
+
+irq7:
+	cli
+	push byte 7
+	push byte 39
+	jmp irq_common_stub
+
+irq8:
+	cli
+	push byte 8
+	push byte 40
+	jmp irq_common_stub
+
+irq9:
+	cli
+	push byte 9
+	push byte 41
+	jmp irq_common_stub
+
+irq10:
+	cli
+	push byte 10
+	push byte 42
+	jmp irq_common_stub
+
+irq11:
+	cli
+	push byte 11
+	push byte 43
+	jmp irq_common_stub
+
+irq12:
+	cli
+	push byte 12
+	push byte 44
+	jmp irq_common_stub
+
+irq13:
+	cli
+	push byte 13
+	push byte 45
+	jmp irq_common_stub
+
+irq14:
+	cli
+	push byte 14
+	push byte 46
+	jmp irq_common_stub
+
+irq15:
+	cli
+	push byte 15
+	push byte 47
+	jmp irq_common_stub
+
 global __vectors
 __vectors:
-    dd isr0
-    dd isr1
-    dd isr2
-    dd isr3
-    dd isr4 
-    dd isr5
-    dd isr6
-    dd isr7
-    dd isr8
-    dd isr9
-    dd isr10 
-    dd isr11
-    dd isr12
-    dd isr13
-    dd isr14
-    dd isr15
-    dd isr16
-    dd isr17
-    dd isr18
-    dd isr19
-    dd isr20 
-    dd isr21
-    dd isr22
-    dd isr23
-    dd isr24
-    dd isr25
-    dd isr26
-    dd isr27
-    dd isr28
-    dd isr29
-    dd isr30
-    dd isr31
+    dd isr0, isr1, isr2, isr3, isr4, isr5, isr6, isr7, isr8, isr9, isr10
+    dd isr11, isr12, isr13, isr14, isr15, isr16, isr17
+    dd isr18, isr19, isr20, isr21, isr22, isr23, isr24
+    dd isr25, isr26, isr27, isr28, isr29, isr20, isr31
+    dd irq0, irq1, irq2, irq3, irq4, irq5, irq6, irq7, irq8, irq9, irq10
+    dd irq11, irq12, irq13, irq14, irq15
+

@@ -1,6 +1,6 @@
 #include "idt.h"
 
-void set_idt_gate(int n, u32 handler) {
+void set_idt_gate(u32 n, u32 handler) {
     idt[n].low_offset = handler & 0xffff;
     idt[n].selector = KERNEL_CS;
     idt[n].always0 = 0;

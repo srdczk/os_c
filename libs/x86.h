@@ -8,6 +8,17 @@ typedef int s32;
 typedef unsigned int u32;
 typedef long long s64;
 typedef unsigned long long u64;
+
+// 中断门
+typedef struct {
+    u16 low_offset;
+    u16 selector;
+    u8 always0;
+    u8 flags;
+    u16 high_offset;
+}__attribute__((packed))idt_gate;
+// 禁用编译器 字节对齐功能
+
 typedef struct {
     u16 limit;
     u32 base;
@@ -23,6 +34,8 @@ typedef struct {
 u8 inb(u16 port);
 void outb(u16 port, u8 data);
 void outw(u16 port, u16 data);
+void sti();
+void cli();
 void lidt(desc *pd);
 // 不使用内存对齐
 

@@ -1,8 +1,9 @@
 #include "../trap/isr.h"
-
 void main() {
-    isr_install();
-    /* Test the interrupts */
-    __asm__ __volatile__("int $2");
-    __asm__ __volatile__("int $3");
+    clear_screen();
+    irq_init();
+    idt_init();
+    clock_init();
+    sti();
+//    while (1);
 }
