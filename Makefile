@@ -4,7 +4,7 @@ run: os.img
 os.img: boot.bin kernel.bin
 	@cat $^ > $@
 
-kernel.bin: kernel_entry.o kernel.o x86.o string.o idt.o isr.o interrupt.o clock.o irq.o
+kernel.bin: kernel_entry.o kernel.o x86.o string.o idt.o isr.o interrupt.o clock.o irq.o keyboard.o
 	@i686-elf-ld -o $@ -Ttext 0x9000 $^ --oformat binary
 
 boot.bin: boot/boot.asm
@@ -27,6 +27,10 @@ irq.o: driver/irq.c
 
 clock.o: driver/clock.c
 	@i686-elf-gcc -g -ffreestanding -c $< -o $@
+
+keyboard.o: driver/keyboard.c
+	@i686-elf-gcc -g -ffreestanding -c $< -o $@
+
 
 kernel.o: kernel/kernel.c
 	 @i686-elf-gcc -g -ffreestanding -c $< -o $@

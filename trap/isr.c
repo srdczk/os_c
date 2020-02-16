@@ -1,5 +1,6 @@
 #include "isr.h"
 #include "../driver/clock.h"
+#include "../driver/keyboard.h"
 
 #define TICK_NUM 100
 
@@ -63,6 +64,13 @@ void irq_handler(trapframe tf) {
             kprint(s);
             kprint("\n");
         }
+    } else if (tf.int_no == IRQ_BEGIN + 1) {
+        // 键盘中断
+        // 读取 扫描码
+        u8 code = inb(0x60);
+        outb(0x20, 0x20);
+        // 发送 EOI -> 8529
+        print_letter(code);
     }
 }
 
