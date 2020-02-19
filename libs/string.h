@@ -17,6 +17,7 @@ void clear_last_line();
 int get_row(int offset);
 int get_col(int offset);
 void memcpy(char *src, char *des, int len);
+void memset(char *src, char val, int len);
 void swap(char *s, int i, int j);
 void int_to_string(int i, char s[]);
 

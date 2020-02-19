@@ -90,6 +90,13 @@ void memcpy(char *src, char *des, int len) {
     }
 }
 
+void memset(char *src, char val, int len) {
+	int i;
+	for (i = 0; i < len; ++i) {
+		*(src + i) = val;
+	}
+}
+
 void swap(char *s, int i, int j) {
     char c = s[i];
     s[i] = s[j];

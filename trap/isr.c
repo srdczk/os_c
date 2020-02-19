@@ -45,13 +45,24 @@ char *trapname(int int_no) {
     return "Unknown Trap";
 }
 void isr_handler(trapframe tf) {
-    kprint("Interrupt: ");
-    char s[3];
-    int_to_string(tf.int_no, s);
-    kprint(s);
-    kprint("    ");
-    kprint(trapname(tf.int_no));
-    kprint("\n");
+    if (tf.int_no == 14) {
+        // 缺页中断
+        u32 fault_addr;
+        asm volatile("mov %%cr2, %0": "=r"(fault_addr));
+        kprint("Page Fault: ");
+        char s[10];
+        int_to_string(fault_addr, s);
+        kprint(s);
+        kprint("\n");
+    } else {
+        kprint("Interrupt: ");
+        char s[3];
+        int_to_string(tf.int_no, s);
+        kprint(s);
+        kprint("    ");
+        kprint(trapname(tf.int_no));
+        kprint("\n");
+    }
 }
 
 void irq_handler(trapframe tf) {
