@@ -1,4 +1,4 @@
-#include "x86.h"
+#include "../include/x86.h"
 
 u8 inb(u16 port) {
     u8 data;
@@ -18,6 +18,9 @@ void sti() {
 void cli() {
     asm volatile("cli");
 }
-void lidt(desc *pd) {
-    asm volatile ("lidt (%0)" :: "r" (pd));
+void lidt(descriptor *desc) {
+    asm volatile ("lidt (%0)" :: "r" (desc));
 }
+
+
+

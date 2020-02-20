@@ -1,107 +1,52 @@
-[org 0x7c00]
 
-load_addr equ 0x9000
 
-; bios set dl -> boot_drive
+; GRUB multiboot 规范
 
-    mov [boot_drive], dl
-    mov bp, 0x9000
-    mov sp, bp
-    call read_floppy
-    ; switch_to_pm -> begin_pm
-    ; 开启保护模式
-    cli
-    lgdt [gdt_descriptor]
-    mov eax, cr0
-    or eax, 0x1
-    mov cr0, eax
-    jmp code_seg: begin_pm
-[bits 16]
-read_floppy:
-    mov bx, load_addr
-    ;after kernel is large -> make it big
-    mov dh, 16
-    mov dl, [boot_drive]
-    pusha
-    push dx
-    mov ah, 0x02
-    mov al, dh
-    mov cl, 0x02
-    mov ch, 0x00
-    mov dh, 0x00
-    int 0x13
-    jc read_error
-    pop dx
-    popa
-    ret
+MBOOT_HEADER_MAGIC  equ 0x1badb002
 
-read_error:
-    hlt
-    jmp read_error
+MBOOT_PAGE_ALIGN    equ 1 << 0 ; 引导模块安装 4K 对齐
+MBOOT_MEM_INFO      equ 1 << 1 ; 让 GRUB 把 内存空间信息包含在 信息结构中
+
+MBOOT_HEADER_FLAGS  equ MBOOT_PAGE_ALIGN
+
+MBOOT_CHECKSUM      equ -(MBOOT_HEADER_MAGIC + MBOOT_HEADER_FLAGS)
+
 
 [bits 32]
-begin_pm:
-    ; kernel 已经被加载 到 0x1000 处
-    mov ax, data_seg
-    mov ds, ax
-    mov ss, ax
-    mov es, ax
-    mov fs, ax
-    mov gs, ax
-    mov esp, 0x9000
-    mov ebp, esp
-    call load_addr
-    jmp $
 
-boot_drive:
-    db 0
-gdt_start: ; don't remove the labels, they're needed to compute sizes and jumps
+section .text
+; 代码段开始
 
-gdt_null:
-    dd 0x0 ; 4 byte
-    dd 0x0 ; 4 byte
+dd MBOOT_HEADER_MAGIC
+dd MBOOT_HEADER_FLAGS
+dd MBOOT_CHECKSUM
 
-; 重新设置 gdt -> 
-gdt_code: 
-    dw 0xffff
-    dw 0x0
-    db 0x0
-    db 0x9a
-    db 0xcf
-    db 0x0
+; 内核代码入口 -> 在 ld 链接脚本中声明
+[global start]
+[global glb_mboot_ptr] ;multiboot 变量
+[extern main] ; kernel c 语言函数入口
 
-gdt_data:
-    dw 0xffff
-    dw 0x0
-    db 0x0
-    db 0x92
-    db 0xcf
-    db 0x0
-gdt_user_code:
-    dw 0xffff
-    dw 0x0
-    db 0x0
-    db 0xfa
-    db 0xcf
-    db 0x0
-gdt_user_data:
-    dw 0xffff
-    dw 0x0
-    db 0x0
-    db 0xf2
-    db 0xcf
-    db 0x0
-gdt_end:
+start:
+    ; 关中断
+    cli
 
-gdt_descriptor:
-    dw gdt_end - gdt_start - 1 ; size (16 bit), always one less of its true size
-    dd gdt_start ; address (32 bit)
+    mov esp, STACK_TOP
+    mov ebp, 0
+    and esp, 0xfffffff0 ; 16 字节对齐
+    mov [glb_mboot_ptr], ebx
+    call main
 
-code_seg equ gdt_code - gdt_start
-data_seg equ gdt_data - gdt_start
-user_code_seg equ gdt_user_code - gdt_start
-user_data_seg equ gdt_user_data - gdt_start
+loop:
+    hlt
+    jmp loop
 
-    times 510 - ($ - $$) db 0
 
-    dw 0xaa55
+section .bss ; 数据段
+stack:
+; 作为内核栈
+    ; 将 glb_multiboot_入栈
+    resb 32768
+glb_mboot_ptr:
+    resb 4
+STACK_TOP   equ $ - stack - 1
+

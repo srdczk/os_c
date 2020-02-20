@@ -1,1 +1,1 @@
-### simple operating system 
+### simple os by c -> turn to GRUB init
