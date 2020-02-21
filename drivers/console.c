@@ -25,15 +25,18 @@ void console_clear() {
     cursor_y = 0;
     set_cursor();
 }
-static void scroll()
-{
+static void scroll() {
     if (cursor_y >= 25) {
         int i;
-        for (int i = 1; i < 25; ++i) {
-            memcpy(vram + i * 2 * MAX_COL, vram + (i - 1) * MAX_COL, 2 * MAX_COL);
-        }
-        
+        for (i = 1; i < 25; ++i) {
+            memcpy(vram + i * 2 * MAX_COL, vram + 2 * (i - 1) * MAX_COL, 2 * MAX_COL);
+        }    
         cursor_y = 24;
+        // 清空最后一行的信息
+        for (i = 0; i < 80; ++i) {
+            vram[2 * (MAX_COL * cursor_y + i)] = ' ';
+            vram[2 * (MAX_COL * cursor_y + i) + 1] = WHITE;
+        }
     }
 }
 
@@ -56,6 +59,12 @@ void console_putc(char c, u8 color) {
     if (cursor_x >= 80) {
         cursor_x = 0;
         cursor_y ++;
+    } else if (cursor_x < 0) {
+        if (!cursor_y) cursor_x = 0;
+        else {
+            cursor_x = 79;
+            --cursor_y;
+        }
     }
     scroll();
     set_cursor();
@@ -74,7 +83,7 @@ void console_print_color(char *s, u8 color) {
 }
 
 void console_print_hex(u32 n, u8 color) {
-    char *hex = "0123456789abcdef";
+    static char *hex = "0123456789abcdef";
     char s[9];
     int i;
     for (i = 0; i < 8; ++i) {
@@ -85,7 +94,7 @@ void console_print_hex(u32 n, u8 color) {
 }
 
 void console_print_dec(u32 n, u8 color) {
-    int cnt = 0, i = 0;
+    int cnt = 0;
     if (!n) {
         console_print_color("0", color);
         return;

@@ -1,13 +1,12 @@
 #include "../include/console.h"
-
-
-void main() {
+#include "../include/clock.h"
+#include "../include/gdt.h"
+#include "../include/x86.h"
+#include "../include/isr.h"
+int main() {
     console_clear();
-    console_print("NIMSILE\n");
-    console_print_color("NIMASOILE\n", RED);
-    console_print_color("KKKOKK\n", GREEN);
-    console_print_hex(0xabcdef01, GREEN);
-    console_print("\n");
-    console_print_dec(3782373, RED);
-    while (1);
+    gdt_init();
+    idt_init();
+    clock_init(200);
+    sti();
 }
