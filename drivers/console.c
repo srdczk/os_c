@@ -112,3 +112,9 @@ void console_print_dec(u32 n, u8 color) {
     }
     console_print_color(s, color);
 }
+
+void panic(const char *s) {
+    console_print_color(s, RED);
+    console_print("\n");
+    while (1);
+}

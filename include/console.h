@@ -27,3 +27,4 @@ void console_print_hex(u32 n, u8 color);
 
 void console_print_dec(u32 n, u8 color);
 
+void panic(const char *s);

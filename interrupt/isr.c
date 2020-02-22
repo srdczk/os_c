@@ -4,7 +4,7 @@
 #define IRQ_BEGIN 0x20
 #define IRQ_END 0x30
 #define TIMER_NUM 100
-
+#define PAGE_FAULT 0x0e
 static u32 cnt = 0;
 
 extern u32 isrs[];
@@ -67,8 +67,17 @@ const char *int_name(int int_no) {
 
 void int_dispatch(int_frame *tf) {
     if (tf->int_no < IRQ_BEGIN) {
-        console_print(int_name(tf->int_no));
-        console_print("\n");
+        if (tf->int_no == PAGE_FAULT) {
+            u32 cr2;
+            asm volatile("mov %%cr2, %0" : "=r"(cr2));
+            console_print_color("PAGE FAULT At: 0x", GREEN);
+            console_print_hex(cr2, GREEN);
+            console_print("\n");
+            panic("PAGE FAULT!");
+        } else {
+            console_print_color(int_name(tf->int_no), RED);
+            console_print("\n");
+        }
     } else {
         if (tf->int_no >= 40) outb(0xa0, 0x20);
         outb(0x20, 0x20);

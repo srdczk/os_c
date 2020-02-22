@@ -8,20 +8,9 @@ int main() {
     console_clear();
     gdt_init();
     idt_init();
+    pmm_init();
     //clock_init(200);
     //sti();
-    console_print("BEGIN: 0x");
-    console_print_hex((u32)kern_start, RED);
-    console_print(", END: 0x");
-    console_print_hex((u32)kern_end, RED);
-    console_print(", Sum: ");
-    u32 size = ((u32)kern_end - (u32)kern_start) / 1024;
-    console_print_dec(size, GREEN);
-    console_print("\n");
-    show_memory();
-    pmm_init();
-    console_print("Page: ");
-    console_print_dec(pmm_stack_size, RED);
-    console_print("\n");
-    console_print_hex(alloc_page(), GREEN);
+    int *a = (int *)0xa0000000;
+    *a = 3;
 }
