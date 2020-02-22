@@ -1,6 +1,16 @@
 #include "../include/pmm.h"
 #include "../include/console.h"
 
+
+// 管理最大的物理内存
+
+u32 pmm_stack[MAX_PHYSICAL_SIZE / PAGE_SIZE + 1];
+u32 physical_page_cnt;
+u32 pmm_stack_size;
+
+// ld 链接脚本中定义的变量, 用来计算 kern 的长度
+
+
 void show_memory() {
     u32 mmap_addr = glb_mboot_ptr->mmap_addr;
 	u32 mmap_length = glb_mboot_ptr->mmap_length;
@@ -18,4 +28,36 @@ void show_memory() {
         console_print("\n");
 
 	}
+}
+
+
+void pmm_init() {
+    pmm_stack_size = 0;
+    physical_page_cnt = 0;
+    u32 mmap_addr = glb_mboot_ptr->mmap_addr;
+    u32 mmap_length = glb_mboot_ptr->mmap_length;
+    mmap_entry *mmap = (mmap_entry *)mmap_addr;
+    for (mmap = (mmap_entry *)mmap_addr; (u32)mmap < mmap_addr + mmap_length; mmap++) {
+        // 
+        // 从 1MB 开始的空 内存开始映射
+        // 内核 开始映射虚拟内存
+        // 可用内存段
+        if (mmap->type == 1 && mmap->base_addr_low == 0x100000) {
+            u32 addr = mmap->base_addr_low + (u32)kern_end - (u32)kern_start;
+            u32 end_addr = MAX_PHYSICAL_SIZE > mmap->length_low + mmap->base_addr_low ? mmap->length_low + mmap->base_addr_low : MAX_PHYSICAL_SIZE;
+            while (addr < end_addr && addr + PAGE_SIZE <= end_addr) {
+                physical_page_cnt++;
+                free_page(addr);
+                addr += PAGE_SIZE;
+            }
+        }
+    }
+}
+
+u32 alloc_page() {
+    return pmm_stack[--pmm_stack_size];
+}
+
+void free_page(u32 addr) {
+    pmm_stack[pmm_stack_size++] = addr;
 }
