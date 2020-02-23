@@ -86,3 +86,28 @@ u32 alloc_page() {
 void free_page(u32 addr) {
     pmm_stack[pmm_stack_size++] = addr;
 }
+
+void map(u32 *pd, u32 va, u32 flags) {
+    // 新分配页面
+    u32 pde_id = PDE_INDEX(va);
+    u32 pte_id = PTE_INDEX(va);
+    // 分配一个真实物理页面
+    pd[pde_id] = (u32)ptes[pde_id] | PRESENT | WRITE;
+    if (!ptes[pde_id][pte_id]) {
+        u32 addr = alloc_page();
+        ptes[pde_id][pte_id] = (addr & PAGE_MASK) | flags;
+    }
+    flush_tlb(va);
+}
+
+void unmap(u32 *pd, u32 va) {
+    // free page;
+    u32 pde_id = PDE_INDEX(va);
+    u32 pte_id = PTE_INDEX(va);
+    if (!ptes[pde_id][pte_id]) return;
+    u32 addr = ptes[pde_id][pte_id] & PAGE_MASK;
+    memset((char *)&ptes[pde_id][pte_id], '\0', sizeof(u32));
+    free_page(addr);
+    flush_tlb(va);
+}
+

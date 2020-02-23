@@ -30,6 +30,8 @@ extern u32 physical_page_cnt;
 
 extern u32 pmm_stack_size;
 
+extern u32 pde[];
+
 void show_memory();
 
 void pmm_init();
@@ -38,4 +40,6 @@ u32 alloc_page();
 
 void free_page(u32 addr);
 
+void map(u32 *pd, u32 va, u32 flags);
 
+void unmap(u32 *pd, u32 va);
