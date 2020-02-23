@@ -11,6 +11,10 @@ int main() {
     pmm_init();
     //clock_init(200);
     //sti();
-    int *a = (int *)0xa0000000;
-    *a = 3;
+    //int *a = (int *)0xa0000000;
+    //*a = 3;
+    show_memory();
+    console_print("\n");
+    console_print_dec(((u32)kernel_end - (u32)kernel_start) / 1024, GREEN);
+    console_print_dec(pmm_stack_size, RED);
 }

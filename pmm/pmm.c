@@ -12,7 +12,8 @@ u32 pmm_stack_size;
 
 // 申请 内核页表 -> 最大 PTE 管理内存 512 MB -> 128 PTE 
 u32 pde[PDE_SIZE]__attribute__((aligned(PAGE_SIZE)));
-static u32 ptes[KERNEL_PTE][PTE_SIZE]__attribute__((aligned(PAGE_SIZE)));
+static u32 ptes[PDE_SIZE][PTE_SIZE]__attribute__((aligned(PAGE_SIZE)));
+
 
 void show_memory() {
     u32 mmap_addr = glb_mboot_ptr->mmap_addr;
@@ -58,7 +59,7 @@ void pmm_init() {
     // 开启分页
     memset(pde, '\0', sizeof(u32));
     int i;
-    for (i = 0; i < KERNEL_PTE; ++i) {
+    for (i = 0; i < PDE_SIZE; ++i) {
         memset(ptes[i], '\0', sizeof(u32) * PTE_SIZE);
     }
     u32 end = (u32)kernel_end;//由于 全部都 4K 对齐了
