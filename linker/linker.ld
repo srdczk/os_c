@@ -1,44 +1,48 @@
-
-
-/**
- * ld 链接脚本 -> 定义 起始函数 start
- * , 以及代码段的起始加载地址 1MB -> 0x100000
- *
- */
-
 ENTRY(start)
 SECTIONS
 {
-	. = 0x100000;
+	PROVIDE( kernel_start = 0xc0100000);
+	. = 0x100000; 
+	.init.text : 
+	{
+		*(.init.text)
+		. = ALIGN(4096);
+	}
+	.init.data : 
+	{
+		*(.init.data)
+		. = ALIGN(4096);
+	}
 
-    PROVIDE(kernel_start = .);
-
-	.text :
+	. += 0xc0000000;
+	.text : AT(ADDR(.text) - 0xc0000000)
 	{
 		*(.text)
 		. = ALIGN(4096);
 	}
-	.data :
+	.data : AT(ADDR(.data) - 0xc0000000)
 	{
 		*(.data)
 		*(.rodata)
 		. = ALIGN(4096);
 	}
-	.bss :
+	.bss : AT(ADDR(.bss) - 0xc0000000)
 	{
 		*(.bss)
 		. = ALIGN(4096);
 	}
-	.stab :
+	.stab : AT(ADDR(.stab) - 0xc0000000)
 	{
 		*(.stab)
 		. = ALIGN(4096);
 	}
-	.stabstr :
+	.stabstr : AT(ADDR(.stabstr) - 0xc0000000)
 	{
 		*(.stabstr)
 	 	. = ALIGN(4096);
 	}
-	PROVIDE(kernel_end = .);
+	PROVIDE( kernel_end = . );
+	
 	/DISCARD/ : { *(.comment) *(.eh_frame) }
 }
+

@@ -19,3 +19,4 @@ void set_idt() {
     idt_desc.limit = IDT_SIZE * sizeof(idt_gate) - 1;
     lidt(&idt_desc);
 }
+

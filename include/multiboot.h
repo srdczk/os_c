@@ -48,5 +48,6 @@ typedef struct {
 	uint32_t type;
 } __attribute__((packed)) mmap_entry;
 
-extern multiboot *glb_mboot_ptr;
+extern multiboot *tmp_multiboot;
+extern multiboot *global_multiboot;
 

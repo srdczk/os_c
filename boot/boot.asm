@@ -1,52 +1,38 @@
 
-
-; GRUB multiboot 规范
-
-MBOOT_HEADER_MAGIC  equ 0x1badb002
-
-MBOOT_PAGE_ALIGN    equ 1 << 0 ; 引导模块安装 4K 对齐
-MBOOT_MEM_INFO      equ 1 << 1 ; 让 GRUB 把 内存空间信息包含在 信息结构中
-
-MBOOT_HEADER_FLAGS  equ MBOOT_PAGE_ALIGN
-
-MBOOT_CHECKSUM      equ -(MBOOT_HEADER_MAGIC + MBOOT_HEADER_FLAGS)
+; 符合 multiboot 规范 
 
 
 [bits 32]
 
-section .text
-; 代码段开始
+section .init.text
 
-dd MBOOT_HEADER_MAGIC
-dd MBOOT_HEADER_FLAGS
-dd MBOOT_CHECKSUM
+dd 0x1badb002 ; 魔数
 
-; 内核代码入口 -> 在 ld 链接脚本中声明
+dd 0x00000003 ; flag 表示 multiboot 读取 内存信息 4KB 对齐
+
+dd 0xe4524ffb ; checksum + flag + migic = 0
+
 [global start]
-[global glb_mboot_ptr] ;multiboot 变量
-[extern main] ; kernel c 语言函数入口
+[global tmp_multiboot]
+[extern main]
 
 start:
-    ; 关中断
-    cli
+    cli ;关中断 -> gdt 还未真正设置
+    mov [tmp_multiboot], ebx
+    mov esp, stack_top
+    and esp, 0xfffffff0; 16 字节对齐
+    xor ebp, ebp
 
-    mov esp, STACK_TOP
-    mov ebp, 0
-    and esp, 0xfffffff0 ; 16 字节对齐
-    mov [glb_mboot_ptr], ebx
     call main
 
-loop:
-    hlt
-    jmp loop
+section .init.data
 
-
-section .bss ; 数据段
 stack:
-; 作为内核栈
-    ; 将 glb_multiboot_入栈
-    resb 32768
-glb_mboot_ptr:
-    resb 4
-STACK_TOP   equ $ - stack - 1
+    times 1024 db 0
+
+stack_top equ $ - stack - 1
+
+tmp_multiboot:
+    dd 0
+
 

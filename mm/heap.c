@@ -65,7 +65,9 @@ void kfree(void *p) {
 
 void alloc_block(u32 start, u32 len) {
     while (start + len > heap_max) {
-        map(pde, heap_max, PRESENT | WRITE);
+        // 新申请 一个 页面 
+        u32 pa = alloc_page();
+        map(kernel_pde, heap_max, pa, PRESENT | WRITE);
         heap_max += PAGE_SIZE;
     }
 }
@@ -78,7 +80,7 @@ void free_block(block *b) {
     while ((heap_max - PAGE_SIZE) >= (u32)b) {
         heap_max -= PAGE_SIZE;
         // 释放 visual addr
-        unmap(pde, heap_max);
+        unmap(kernel_pde, heap_max);
     }
 }
 
@@ -110,5 +112,4 @@ void union_block(block *b) {
     }
     if (!b->next) free_block(b);
 }
-
 

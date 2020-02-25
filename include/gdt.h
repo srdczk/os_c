@@ -15,3 +15,4 @@ typedef struct {
 void gdt_init();
 
 
+

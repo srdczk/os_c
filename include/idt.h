@@ -21,3 +21,4 @@ typedef struct {
 void set_idt_gate(u32 num, u32 handler);
 void set_idt();
 
+

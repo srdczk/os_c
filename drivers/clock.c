@@ -1,5 +1,5 @@
 #include "../include/clock.h"
-
+#include "../include/x86.h"
 u32 ticks;
 
 void clock_init(u32 fre) {
@@ -14,3 +14,4 @@ void clock_init(u32 fre) {
 	outb(0x40, hign);
     ticks = 0;
 }
+

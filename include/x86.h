@@ -10,4 +10,4 @@ void cli();
 void lidt(descriptor *desc);
 u32 read_ebp();
 u32 read_eip();
-void flush_tlb(u32 va);
+

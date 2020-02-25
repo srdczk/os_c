@@ -16,5 +16,3 @@ void heap_init();
 void *kmalloc(u32 len);
 
 void kfree(void *p);
-
-

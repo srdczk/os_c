@@ -34,6 +34,5 @@ u32 read_eip(void) {
     return eip;
 }
 
-void flush_tlb(u32 va) {
-    asm volatile ("invlpg (%0)" :: "a"(va));
-}
+
+

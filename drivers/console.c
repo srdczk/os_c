@@ -1,6 +1,6 @@
 #include "../include/console.h"
 
-static u8 *vram = (char *)0xb8000;
+static char *vram = (char *)(0xb8000 + 0xc0000000);
 
 static u8 cursor_x = 0;
 static u8 cursor_y = 0;
@@ -113,8 +113,3 @@ void console_print_dec(u32 n, u8 color) {
     console_print_color(s, color);
 }
 
-void panic(const char *s) {
-    console_print_color(s, RED);
-    console_print("\n");
-    while (1);
-}
