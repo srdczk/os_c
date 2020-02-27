@@ -1,9 +1,11 @@
 #include "../include/console.h"
 #include "../include/pmm.h"
+#include "../include/debug.h"
 #include "../include/clock.h"
+#include "../include/thread.h"
+#include "../include/schedule.h"
 #include "../include/isr.h"
 #include "../include/gdt.h"
-#include "../include/heap.h"
 // 设置临时页表
 
 #define STACK_SIZE 8192
@@ -48,31 +50,36 @@ __attribute__((section(".init.text"))) void main() {
     kernel_init();
 }
 
+int flag = 0;
+
+void thread(void *arg) {
+    while (1) {
+        if (flag) {
+            console_print_color("A", GREEN);
+            flag = 0;
+        }
+    }
+}
+
 void kernel_init() {
     console_clear();
     gdt_init();
-//    clock_init(200);
+    clock_init(200);
     idt_init();
- //   sti();
-
-    show_memory();
-    console_print("\n");
     pmm_init();
-    heap_init();
-    int *a = (int *)kmalloc(4);
-    console_print_hex((u32)a, RED);
-    int *b = (int *)kmalloc(4);
-    console_print("\n");
-    console_print_hex((u32)b, GREEN);
-    console_print("\n");
-    kfree(b);
-    kfree(a);
-    a = (int *)kmalloc(12);
-    console_print_hex((u32)a, GREEN);
-    console_print_dec(physical_page_cnt, RED);
-    console_print("\n");
-    console_print_dec(((u32)kernel_end - (u32)kernel_start) / 1024, GREEN);
+    sti();
+    init_schedule();
+    kernel_thread(thread, 0);
+    while (1) {
+        if (!flag) {
+            console_print_color("B", RED);
+            flag = 1;
+        }
+    }
+    //ASSERT(strlen(s) == 4);
     while (1) {
         asm volatile ("hlt");
     }
 }
+
+

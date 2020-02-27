@@ -1,1 +1,1 @@
-### simple os by c -> turn to GRUB init
+### kernel which load in 0xc0000000 unix like

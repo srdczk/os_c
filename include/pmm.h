@@ -1,11 +1,14 @@
 #pragma once
 
+#include "bitmap.h"
+#include "multiboot.h"
 
-#include "../include/multiboot.h"
+#define PG_PRESENT 0x1
 
-#define PRESENT 0x1
+#define PG_RW 0x2
 
-#define WRITE 0x2
+#define PG_USER 0x4
+
 // 管理的最大物理内存
 #define MAX_PHYSICAL_SIZE 0x20000000
 // 页面大小
@@ -23,14 +26,26 @@
 
 #define PDE_SIZE 1024
 
+#define KERNEL_SPACE_SIZE 0x40000000
+
+#define PTE_OFFSET 0xffc00000
+
 extern u8 kernel_start[];
 extern u8 kernel_end[];
 
-extern u32 kernel_pde[];
+typedef struct {
+    bitmap bmap;
+    u32 addr_start;
+} pool;
 
-extern u32 physical_page_cnt;
+typedef enum {
+    PF_KERNEL,
+    PF_USER
+} pool_flag;
 
-extern u32 pmm_stack_size;
+extern u32 pstack_top;
+
+extern pool kernel_pool;
 
 void show_memory();
 
@@ -40,13 +55,11 @@ u32 alloc_page();
 
 void free_page(u32 addr);
 
+void kernel_pool_init();
+
 void pmm_init();
 
-void pde_enable(u32 pde_addr);
+void map(u32 va, u32 flags);
 
-void map(u32 *pded, u32 va, u32 pa, u32 flag);
-
-void unmap(u32 *pded, u32 va);
-
-
+void *malloc_page(pool_flag pf, u32 cnt);
 

@@ -36,3 +36,11 @@ u32 read_eip(void) {
 
 
 
+u32 read_eflags() {
+    u32 eflags;
+    asm volatile ("pushfl \n\t"
+                  "popl %0"
+                  :
+                  "=g"(eflags));
+    return eflags;
+}
