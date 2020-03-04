@@ -5,6 +5,7 @@
 #include "../include/list.h"
 #include "../include/debug.h"
 #include "../include/clock.h"
+#include "../include/syscall.h"
 #include "../include/isr.h"
 #include "../include/gdt.h"
 #include "../include/process.h"
@@ -54,31 +55,24 @@ void thread(void *arg) {
 }
 
 void thread_a(void *arg) {
-    while (1) {
-        console_print("THREADA");
-        console_print("\n");
-    }
+    console_print_dec(24/*sys_getpid(NULL)*/, MAGENTA);
+    console_print("\n");
+    while (1);
 }
 
 void thread_b(void *arg) {
-    while (1) {
-        console_print_color("THREADB", MAGENTA);
-        console_print("\n");
-    }
+    console_print_dec(23/*sys_getpid(NULL)*/, WHITE);
+    console_print("\n");
+    while (1);
 }
 
 void u_proc_a() {
-    while (1) {
-        console_print_color("USERA", GREEN);
-        console_print("\n");
-    }
+    asm volatile ("int $0x80");
+    while (1);
 }
 
 void u_proc_b() {
-    while (1) {
-        console_print_color("USERB", RED);
-        console_print("\n");
-    }
+    while (1) ;
 }
 
 
@@ -89,10 +83,11 @@ void kernel_init() {
     idt_init();
     pmm_init();
     kernel_thread_init();
-    thread_start("THREADA", 23, thread_a, NULL);
-    thread_start("THREADB", 23, thread_b, NULL);
-    process_exec(u_proc_a, "PROCA");
-    process_exec(u_proc_b, "PROCB");
+//    sys_init();
+    thread_start("ta", 23, thread_a, NULL);
+    thread_start("tb", 23, thread_b, NULL);
+    process_exec(u_proc_a, "pa");
+//    process_exec(u_proc_b, "pb");
     enable_int();
     while (1) {
         asm volatile ("hlt");

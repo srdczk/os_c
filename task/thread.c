@@ -8,6 +8,7 @@
 
 #define TSTACK_SIZE 0x1000
 
+int global_pid = 0;
 
 task_struct *cur_thread;
 // 就绪队列和全局队列
@@ -61,7 +62,7 @@ void thread_init(task_struct *pthread, char *name, u32 priority) {
 
 task_struct *thread_start(char *name, int priority, thread_func *func, void *arg) {
     task_struct *pthread = kmalloc_page(1, kernel_pde);
-    thread_init(pthread, name, priority);
+    thread_init(pthread, name, (u32) priority);
     thread_create(pthread, func, arg);
 
     list_add_last(&ready_list, &pthread->general_tag);

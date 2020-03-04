@@ -74,6 +74,8 @@ global irq13
 global irq14
 global irq15
 
+global isr_syscall
+
 isr0:
 
     push byte 0
@@ -381,6 +383,10 @@ irq15:
 	push byte 47
     jmp all_int
 
+isr_syscall:
+    push byte 0
+    push byte 0x80
+    jmp all_int
 
 [global isrs]
 isrs:
@@ -389,5 +395,5 @@ isrs:
     dd isr18, isr19, isr20, isr21, isr22, isr23, isr24
     dd isr25, isr26, isr27, isr28, isr29, isr20, isr31
     dd irq0, irq1, irq2, irq3, irq4, irq5, irq6, irq7, irq8, irq9, irq10
-    dd irq11, irq12, irq13, irq14, irq15
+    dd irq11, irq12, irq13, irq14, irq15, isr_syscall
 

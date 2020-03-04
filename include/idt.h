@@ -2,6 +2,9 @@
 
 #include "types.h"
 
+// 使用 0x80 号中断作系统调用
+#define T_SYSCALL 0x80
+
 // 中断门
 typedef struct {
     u16 low_offset;

@@ -2,6 +2,7 @@
 
 #include "types.h"
 #include "list.h"
+#include "pmm.h"
 
 typedef void thread_func(void *);
 
@@ -41,6 +42,8 @@ typedef struct {
     list_node general_tag;
     list_node global_tag;
     u32 pgdir; // 进程持有, 自己的页表(虚拟地址)
+    // 用户进程虚拟内存的bitmap, 用于 malloc
+    pool user_pool;
     // 魔数, 检测栈是否溢出
     u32 stack_magic;
 } task_struct;

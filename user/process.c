@@ -52,12 +52,13 @@ void start_process(void *func) {
     u32 *esp = (u32 *)((u32) pthread + PAGE_SIZE);
     *(--esp)  = USER_DS;
     // 先设置用户栈底 为用户空间申请的0xc0000000 - 0x1000 + 0x1000, 先只调度一个用户进程
-    *(--esp) = ((u32)(get_user_page(USER_STACK_TOP, pthread)) + 0x1000);
+    *(--esp) = ((u32)(get_user_page(USER_STACK_TOP)) + 0x1000);
     *(--esp) = EFLAGS_IF_1 | EFLAGS_MBS | EFLAGS_IOPL_0;
     *(--esp) = USER_CS;
     *(--esp) = (u32) func;
 
-    asm volatile ("movl %0, %%esp;"
+    asm volatile ("cli;"
+                  "movl %0, %%esp;"
                   "mov $0x23, %%eax;"
                   "mov %%ax, %%gs;"
                   "mov %%ax, %%fs;"
@@ -81,6 +82,16 @@ void process_enable(task_struct *pthread) {
     if (pthread->pgdir) update_esp0((u32) pthread + PAGE_SIZE);
 
 }
+
+void user_pool_init(task_struct *thread) {
+    // 初始化用户位图
+    thread->user_pool.addr_start = USER_OFFSET;
+    u32 page_cnt = DIV_ROUND_UP((KERNEL_PAGE_OFFSET - USER_OFFSET) / (PAGE_SIZE * 8), PAGE_SIZE);
+    thread->user_pool.bmap.map = kmalloc_page(page_cnt, kernel_pde);
+    thread->user_pool.bmap.map_len = (KERNEL_PAGE_OFFSET - USER_OFFSET) / (PAGE_SIZE * 8);
+    bitmap_init(&thread->user_pool.bmap);
+}
+
 // 创建进程自己的页表
 void *create_pde() {
     // 内核空间申请
@@ -99,6 +110,7 @@ void *create_pde() {
 void process_exec(void *func, char *name) {
     task_struct *thread = kmalloc_page(1, kernel_pde);
     thread_init(thread, name, DEFAULT_PRIO);
+    user_pool_init(thread);
     thread_create(thread, start_process, func);
     thread->pgdir = (u32) create_pde();
     list_add_last(&ready_list, &thread->general_tag);

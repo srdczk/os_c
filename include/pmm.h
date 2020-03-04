@@ -63,7 +63,9 @@ void map(u32 va, u32 *pde, u32 flags);
 
 void *kmalloc_page(u32 cnt, u32 *pde);
 
-void *get_user_page(u32 va, task_struct *thread);
+void *umalloc_page(u32 cnt);
+
+void *get_user_page(u32 va);
 
 u32 va2pa(u32 va);
 

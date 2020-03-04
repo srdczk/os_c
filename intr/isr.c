@@ -5,6 +5,7 @@
 #include "../include/debug.h"
 #include "../include/keyboard.h"
 #include "../include/string.h"
+#include "../include/syscall.h"
 
 #define IRQ_BEGIN 0x20
 #define IRQ_END 0x30
@@ -66,6 +67,8 @@ void idt_init() {
     for (i = 0; i < 48; ++i) {
         set_idt_gate((u32) i, isrs[i], 0x08, 0x8e);
     }
+    // 设置 系统调用, DPL = 3
+    set_idt_gate(T_SYSCALL, isrs[48], 0x08, 0xef);
     set_idt();
 }
 
@@ -113,7 +116,7 @@ void int_dispatch(int_frame *tf) {
             strcat(s, msg);
             PANIC(msg);
         }
-    } else {
+    } else if (tf->int_no < 0x80) {
         if (tf->int_no >= 40) outb(0xa0, 0x20);
         outb(0x20, 0x20);
         if (tf->int_no == IRQ_BEGIN) {
@@ -121,6 +124,6 @@ void int_dispatch(int_frame *tf) {
         } else if (tf->int_no == IRQ_BEGIN + 1) {
             keyboard_handler(inb(KEY_PORT));
         }
-    }
+    } else syscall(tf);
 }
 

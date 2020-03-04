@@ -1,7 +1,11 @@
-#include "../include/thread.h"
 #include "../include/pmm.h"
 #include "../include/debug.h"
 #include "../include/console.h"
+#include "../include/sync.h"
+
+// 申请内存时候互斥
+
+semaphore mem_sem;
 
 static u32 pstack[MAX_PHYSICAL_SIZE / PAGE_SIZE + 1];
 
@@ -74,6 +78,7 @@ void kernel_pool_init() {
 void pmm_init() {
     pstack_init();
     kernel_pool_init();
+    sem_init(&mem_sem, 1);
     // 连连续 1024 个页表
     // 先分配 最顶端 4MB 给所有的页表
     memset((char *)kernel_pde, '\0', PAGE_SIZE);
@@ -107,6 +112,8 @@ void map(u32 va, u32 *pde, u32 flags) {
 }
 
 void *kmalloc_page(u32 cnt, u32 *pde) {
+    // 申请内存时互斥
+    sem_down(&mem_sem);
     int index = bitmap_apply(&kernel_pool.bmap, cnt);
     if (index == -1) return 0;
     // 释放 cnt 个 页面
@@ -119,12 +126,29 @@ void *kmalloc_page(u32 cnt, u32 *pde) {
         base_addr += PAGE_SIZE;
         i++;
     }
+    sem_up(&mem_sem);
     return (void *)res;
 }
 
-void *get_user_page(u32 va, task_struct *thread) {
+void *umalloc_page(u32 cnt) {
+    task_struct *thread = running_thread();
+    int index = bitmap_apply(&thread->user_pool.bmap, cnt);
+    u32 res = index * PAGE_SIZE + thread->user_pool.addr_start;
+    int i = 0;
+    while (i < cnt) {
+        u32 va = res + i++ * PAGE_SIZE;
+        get_user_page(va);
+    }
+    return (void *)res;
+}
+
+void *get_user_page(u32 va) {
+    sem_down(&mem_sem);
+    task_struct *thread = running_thread();
     // 用户页表
     map(va, (u32 *)thread->pgdir, PG_PRESENT | PG_RW | PG_USER);
+    bitmap_set(&thread->user_pool.bmap, (va - thread->user_pool.addr_start) / PAGE_SIZE, 1);
+    sem_up(&mem_sem);
     return (void *)va;
 }
 
@@ -137,5 +161,4 @@ u32 va2pa(u32 va) {
     u32 *pte = (u32 *)(PTE_OFFSET + (pde_id) * PAGE_SIZE);
 
     return (pte[pte_id] & PAGE_MASK) | (va & 0x00000fff);
-
 }
