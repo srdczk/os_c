@@ -55,7 +55,7 @@ void thread(void *arg) {
 }
 
 void thread_a(void *arg) {
-    console_print_dec(24/*sys_getpid(NULL)*/, MAGENTA);
+    console_print_dec(sys_getpid(NULL), MAGENTA);
     console_print("\n");
     while (1);
 }
@@ -67,11 +67,13 @@ void thread_b(void *arg) {
 }
 
 void u_proc_a() {
-    asm volatile ("int $0x80");
+    console_print_dec(getpid(), GREEN);
+    console_print("\n");
     while (1);
 }
 
 void u_proc_b() {
+    write("PROCB\n");
     while (1) ;
 }
 
@@ -83,11 +85,10 @@ void kernel_init() {
     idt_init();
     pmm_init();
     kernel_thread_init();
-//    sys_init();
     thread_start("ta", 23, thread_a, NULL);
-    thread_start("tb", 23, thread_b, NULL);
+//    thread_start("tb", 23, thread_b, NULL);
     process_exec(u_proc_a, "pa");
-//    process_exec(u_proc_b, "pb");
+    process_exec(u_proc_b, "pb");
     enable_int();
     while (1) {
         asm volatile ("hlt");

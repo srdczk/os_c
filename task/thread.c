@@ -54,6 +54,7 @@ void thread_init(task_struct *pthread, char *name, u32 priority) {
     // 和正在运行的内核栈 统一 -> 分配 1 页 大小的栈空间
     pthread->self_stack = (u32)pthread + TSTACK_SIZE;
     pthread->priority = priority;
+    pthread->pid = global_pid++;
     pthread->ticks = priority;
     pthread->running_ticks = 0;
     pthread->pgdir = 0;

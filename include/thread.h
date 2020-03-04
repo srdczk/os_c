@@ -32,6 +32,7 @@ typedef struct {
     u32 self_stack;
     // 任务状态
     task_status status;
+    u32 pid;
     char name[16];
     u32 priority;
     u32 ticks;  // 每次处理器上执行的tick -> 和线程优先级 有关
