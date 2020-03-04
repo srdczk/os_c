@@ -8,6 +8,7 @@ void outw(u16 port, u16 data);
 void sti();
 void cli();
 void lidt(descriptor *desc);
+u32 read_esp();
 u32 read_ebp();
 u32 read_eip();
 u32 read_eflags();

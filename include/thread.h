@@ -1,35 +1,66 @@
 #pragma once
 
 #include "types.h"
+#include "list.h"
 
 typedef void thread_func(void *);
 
 typedef enum {
-    SLEEPING,
-    RUNNABLE,
+    RUNNING,
+    BLOCKED,
+    WAITING,
+    HANGING,
+    READY,
     DIED
-} task_state;
+} task_status;
 
-// 线程上下文信息
+// kernel_thread 参数 -> kernel_thread(thread_func *, void *)
 typedef struct {
-    // eflags 置为 0x200 -> 开启中断
-    u32 esp, ebp, ebx, esi, edi, eflags;
-} context;
+    // caller 保存寄存器
+    u32 ebp, ebx, edi, esi;
+    u32 ret_func;
+    u32 unused_ret;
+    // 第一个参数
+    thread_func *func;
+    void *arg;
+} task_stack;
 
-//任务控制块 tcb / pcb
-typedef struct task_struct {
-    volatile task_state state;
-    u32 pid;
-    void *stack; //内核栈
-    context text;
-    struct task_struct *next; // 链表结构
+// 任务控制块 TCB PCB
+typedef struct {
+    // 指针 -> esp 指向
+    u32 self_stack;
+    // 任务状态
+    task_status status;
+    char name[16];
+    u32 priority;
+    u32 ticks;  // 每次处理器上执行的tick -> 和线程优先级 有关
+    // 此任务执行了多久
+    u32 running_ticks;
+    // 所有 节点中的tag 和一般队列中的tag
+    // 用于 转换成 thread
+    list_node general_tag;
+    list_node global_tag;
+    u32 pgdir; // 进程持有, 自己的页表(虚拟地址)
+    // 魔数, 检测栈是否溢出
+    u32 stack_magic;
 } task_struct;
 
-// 全局 pid 的值 -> 每次申请 一个pid++
+extern list ready_list;
+extern list global_list;
 
-extern u32 global_pid;
+task_struct *running_thread();
 
-u32 kernel_thread(thread_func *func, void *arg);
+void thread_create(task_struct *pthread, thread_func *func, void *arg);
 
-void kernel_thread_exit();
+void thread_init(task_struct *pthread, char *name, u32 priority);
+
+task_struct *thread_start(char *name, int priority, thread_func *func, void *arg);
+
+void kernel_thread_init();
+
+void schedule();
+
+void thread_block(task_status status);
+
+void thread_unblock(task_struct *pthread);
 

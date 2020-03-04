@@ -41,8 +41,15 @@ static void scroll() {
 }
 
 void console_putc(char c, u8 color) {
-    if (c == 0x08 && cursor_x) {
-          cursor_x--;
+    if (c == '\b') {
+          if (!cursor_x--) {
+              if (!cursor_y) cursor_x = 0;
+              else {
+                  cursor_y--;
+                  cursor_x = 79;
+              }
+          }
+          vram[2 * (cursor_y * MAX_COL + cursor_x)] = ' ';
     } else if (c == 0x09) {
           cursor_x = (cursor_x+8) & ~(8-1);
     } else if (c == '\r') {
@@ -59,12 +66,6 @@ void console_putc(char c, u8 color) {
     if (cursor_x >= 80) {
         cursor_x = 0;
         cursor_y ++;
-    } else if (cursor_x < 0) {
-        if (!cursor_y) cursor_x = 0;
-        else {
-            cursor_x = 79;
-            --cursor_y;
-        }
     }
     scroll();
     set_cursor();

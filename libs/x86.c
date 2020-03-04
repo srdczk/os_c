@@ -22,6 +22,12 @@ void lidt(descriptor *desc) {
     asm volatile ("lidt (%0)" :: "r" (desc));
 }
 
+u32 read_esp() {
+    u32 esp;
+    asm volatile ("movl %%esp, %0" : "=r"(esp));
+    return esp;
+}
+
 u32 read_ebp() {
     u32 ebp;
     asm volatile ("movl %%ebp, %0" : "=r" (ebp));

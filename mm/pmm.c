@@ -1,3 +1,4 @@
+#include "../include/thread.h"
 #include "../include/pmm.h"
 #include "../include/debug.h"
 #include "../include/console.h"
@@ -10,13 +11,10 @@ static char kernel_bits[(KERNEL_SPACE_SIZE - 2 * PAGE_SIZE * 1024) / (PAGE_SIZE 
 
 pool kernel_pool;
 
-static u32 tmp_kernel_pde[1024] __attribute__((aligned(PAGE_SIZE)));
+// 正式内核页目录
+u32 kernel_pde[1024] __attribute__((aligned(PAGE_SIZE)));
 
-static u32 tmp_pte_low[1024] __attribute__((aligned(PAGE_SIZE)));
-
-static u32 tmp_pte_high[1024] __attribute__((aligned(PAGE_SIZE)));
-
-static u32 kernel_pde[1024] __attribute__((aligned(PAGE_SIZE)));
+static u32 tmp_pte[1024] __attribute__((aligned(PAGE_SIZE)));
 
 void show_memory() {
     u32 mmap_addr = global_multiboot->mmap_addr;
@@ -78,66 +76,66 @@ void pmm_init() {
     kernel_pool_init();
     // 连连续 1024 个页表
     // 先分配 最顶端 4MB 给所有的页表
+    memset((char *)kernel_pde, '\0', PAGE_SIZE);
     int i;
     for (i = 0; i < 1024; ++i) {
-        tmp_pte_low[i] = (i << 12) | PG_PRESENT | PG_RW;
+        tmp_pte[i] = (u32)(i << 12) | PG_PRESENT | PG_RW | PG_USER;
     }
-    for (i = 0; i < 1024; ++i) {
-        tmp_pte_high[i] = alloc_page() | PG_PRESENT | PG_RW;
-    }
-    tmp_kernel_pde[PDE_INDEX(KERNEL_PAGE_OFFSET)] = ((u32)tmp_pte_low - KERNEL_PAGE_OFFSET) | PG_PRESENT | PG_RW;
-    tmp_kernel_pde[1023] = ((u32)tmp_pte_high - KERNEL_PAGE_OFFSET) | PG_PRESENT | PG_RW;
+    // 0xc0000000 -> 0xc0400000 映射到 0 - 4M
+    kernel_pde[PDE_INDEX(KERNEL_PAGE_OFFSET)] = ((u32)tmp_pte - KERNEL_PAGE_OFFSET) | PG_USER | PG_RW | PG_PRESENT;
+    // 页表 最后 一 位 设为 页表的物理地址, 特殊操作 0xffc00000 -> 0xffffffff 全部是页表
+    kernel_pde[1023] = ((u32) kernel_pde - KERNEL_PAGE_OFFSET) | PG_PRESENT | PG_USER | PG_RW;
     // 重新分页
-    asm volatile ("mov %0, %%cr3" :: "r"((u32)tmp_kernel_pde - KERNEL_PAGE_OFFSET));
-    // 已经分配 的 0xffc00000 - 0xffffffff 作为 所有pte, 映射到真正的pde中
-    for (i = 0; i < 1024; ++i) {
-    //    u32 addr = PTE_OFFSET + i * PAGE_SIZE;
-    //    console_print_hex(addr, GREEN);console_print("\n");
-        char *start = (char *)(PTE_OFFSET + i * PAGE_SIZE);
-        memset(start, '\0', PAGE_SIZE);
-        u32 *begin = (u32 *)(PTE_OFFSET + i * PAGE_SIZE);
-        // 真正的物理地址
-        kernel_pde[i] = tmp_pte_high[i];
-        int j;
-        if (i == PDE_INDEX(KERNEL_PAGE_OFFSET)) {
-            memcpy((char *)tmp_pte_low, start, PAGE_SIZE);
-        } else if (i == 1023) {
-            memcpy((char *)tmp_pte_high, start, PAGE_SIZE);;
-        }
-    }
     asm volatile ("mov %0, %%cr3" :: "r"((u32)kernel_pde - KERNEL_PAGE_OFFSET));
 }
 
 // 新映射的
-void map(u32 va, u32 flags) {
-    u32 addr = alloc_page();
+void map(u32 va, u32 *pde, u32 flags) {
+    // 映射新的虚拟地址
     u32 pde_id = PDE_INDEX(va);
     u32 pte_id = PTE_INDEX(va);
 
+    if (!pde[pde_id]) pde[pde_id] = alloc_page() | PG_USER | PG_PRESENT | PG_RW;
+
     u32 *pte = (u32 *)(PTE_OFFSET + (pde_id) * PAGE_SIZE);
 
-    pte[pte_id] = addr | flags;
+    pte[pte_id] = alloc_page() | flags;
 
     // 更新 TLB
     
     asm volatile ("invlpg (%0)" :: "a"(va));
 }
 
-void *malloc_page(pool_flag pf, u32 cnt) {
-    if (pf == PF_KERNEL) {
+void *kmalloc_page(u32 cnt, u32 *pde) {
+    int index = bitmap_apply(&kernel_pool.bmap, cnt);
+    if (index == -1) return 0;
+    // 释放 cnt 个 页面
+    u32 base_addr = kernel_pool.addr_start + index * PAGE_SIZE;
+    u32 res = base_addr;
+    int i = 0;
+    while (i < cnt) {
+        bitmap_set(&kernel_pool.bmap, index++, 1);
+        map(base_addr, pde, PG_PRESENT | PG_RW | PG_USER);
+        base_addr += PAGE_SIZE;
+        i++;
+    }
+    return (void *)res;
+}
 
-        int index = bitmap_apply(&kernel_pool.bmap, cnt);
-        if (index == -1) return 0;
-        // 释放 cnt 个 页面
-        u32 base_addr = kernel_pool.addr_start + index * PAGE_SIZE;
-        u32 res = base_addr;
-        int i = 0;
-        while (i < cnt) {
-            bitmap_set(&kernel_pool.bmap, index++, 1);
-            map(base_addr, PG_PRESENT | PG_RW);
-            base_addr += PAGE_SIZE;
-            i++;
-        }
-        return (void *)res;
-    } else return 0;
+void *get_user_page(u32 va, task_struct *thread) {
+    // 用户页表
+    map(va, (u32 *)thread->pgdir, PG_PRESENT | PG_RW | PG_USER);
+    return (void *)va;
+}
+
+u32 va2pa(u32 va) {
+    // 获取真实的物理地址
+    u32 pde_id = PDE_INDEX(va);
+    u32 pte_id = PTE_INDEX(va);
+
+    // 当前 映射0xffc00000 + 一定能获取到页表项
+    u32 *pte = (u32 *)(PTE_OFFSET + (pde_id) * PAGE_SIZE);
+
+    return (pte[pte_id] & PAGE_MASK) | (va & 0x00000fff);
+
 }

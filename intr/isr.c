@@ -1,9 +1,10 @@
 #include "../include/isr.h"
+#include "../include/thread.h"
 #include "../include/console.h"
 #include "../include/clock.h"
 #include "../include/debug.h"
+#include "../include/keyboard.h"
 #include "../include/string.h"
-#include "../include/schedule.h"
 
 #define IRQ_BEGIN 0x20
 #define IRQ_END 0x30
@@ -12,12 +13,11 @@
 #define PAGE_FAULT 0x0e
 // 如果开启了中断 eflags 第 9 位设 为 1
 #define IF_EFLAGS 0x00000200
+#define KEY_PORT 0x60
 
 static u32 cnt = 0;
 
 extern u32 isrs[];
-
-
 
 int_status get_int_status() {
     return (read_eflags() & IF_EFLAGS) ? INT_ON : INT_OFF;
@@ -64,7 +64,7 @@ void idt_init() {
 	outb(0xa1, 0x0);
     int i;
     for (i = 0; i < 48; ++i) {
-        set_idt_gate(i, isrs[i]);
+        set_idt_gate((u32) i, isrs[i], 0x08, 0x8e);
     }
     set_idt();
 }
@@ -119,10 +119,7 @@ void int_dispatch(int_frame *tf) {
         if (tf->int_no == IRQ_BEGIN) {
             schedule();
         } else if (tf->int_no == IRQ_BEGIN + 1) {
-            u8 code = inb(0x60);
-            console_print("Keyboard: ");
-            console_print_dec(code, RED);
-            console_print("\n");
+            keyboard_handler(inb(KEY_PORT));
         }
     }
 }

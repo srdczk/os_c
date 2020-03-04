@@ -32,7 +32,7 @@
 
 extern u8 kernel_start[];
 extern u8 kernel_end[];
-
+extern u32 kernel_pde[];
 typedef struct {
     bitmap bmap;
     u32 addr_start;
@@ -59,7 +59,11 @@ void kernel_pool_init();
 
 void pmm_init();
 
-void map(u32 va, u32 flags);
+void map(u32 va, u32 *pde, u32 flags);
 
-void *malloc_page(pool_flag pf, u32 cnt);
+void *kmalloc_page(u32 cnt, u32 *pde);
+
+void *get_user_page(u32 va, task_struct *thread);
+
+u32 va2pa(u32 va);
 

@@ -29,3 +29,8 @@ clean:
 
 qemu:
 	qemu-system-i386 -m 512M -kernel zl_kernel
+
+gdb:
+	qemu-system-i386 -S -s -m 512M -kernel zl_kernel &
+	sleep 1
+	gdb -x gdbinit
