@@ -1,1 +1,5 @@
+.idea
 *.json
+*.sh
+*.iml
+*.xml

@@ -86,5 +86,7 @@ void gdt_init();
 
 void update_esp0(u32 esp0);
 
+u32 get_esp0();
+
 
 

@@ -1,7 +1,6 @@
 //
 // Created by srdczk on 20-3-4.
 //
-
 #include "../include/syscall.h"
 #include "../include/thread.h"
 #include "../include/console.h"

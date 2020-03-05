@@ -1,7 +1,8 @@
 #include "../include/pmm.h"
+#include "../include/sync.h"
 #include "../include/debug.h"
 #include "../include/console.h"
-#include "../include/sync.h"
+
 
 // 申请内存时候互斥
 
@@ -131,6 +132,7 @@ void *kmalloc_page(u32 cnt, u32 *pde) {
 }
 
 void *umalloc_page(u32 cnt) {
+    sem_down(&mem_sem);
     task_struct *thread = running_thread();
     int index = bitmap_apply(&thread->user_pool.bmap, cnt);
     u32 res = index * PAGE_SIZE + thread->user_pool.addr_start;
@@ -139,17 +141,24 @@ void *umalloc_page(u32 cnt) {
         u32 va = res + i++ * PAGE_SIZE;
         get_user_page(va);
     }
+    sem_up(&mem_sem);
     return (void *)res;
 }
 
 void *get_user_page(u32 va) {
-    sem_down(&mem_sem);
     task_struct *thread = running_thread();
     // 用户页表
     map(va, (u32 *)thread->pgdir, PG_PRESENT | PG_RW | PG_USER);
     bitmap_set(&thread->user_pool.bmap, (va - thread->user_pool.addr_start) / PAGE_SIZE, 1);
-    sem_up(&mem_sem);
     return (void *)va;
+}
+
+// 信号量不能重复 down, 由于用户栈申请, 单独提供sync 方法
+void *sync_get_user_page(u32 va) {
+    sem_down(&mem_sem);
+    void *res = get_user_page(va);
+    sem_up(&mem_sem);
+    return res;
 }
 
 u32 va2pa(u32 va) {

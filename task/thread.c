@@ -1,9 +1,11 @@
 #include "../include/thread.h"
+#include "../include/gdt.h"
 #include "../include/string.h"
 #include "../include/debug.h"
 #include "../include/idt.h"
 #include "../include/isr.h"
 #include "../include/pmm.h"
+#include "../include/console.h"
 #include "../include/process.h"
 
 #define TSTACK_SIZE 0x1000
@@ -89,7 +91,7 @@ void kernel_thread_init() {
 
 void schedule() {
     // 加入 ready list, 并从 ready list 中弹出 最前的运行 switch_to
-    task_struct *now_thread = cur_thread;
+    task_struct *now_thread = running_thread();
     ++now_thread->running_ticks;
     if (!--now_thread->ticks) {
         // 开始进行调度
@@ -107,8 +109,8 @@ void schedule() {
 
 void thread_block(task_status status) {
     ASSERT(status == BLOCKED || status == HANGING || status == WAITING);
-    disable_int();
-    task_struct *now_thread = cur_thread;
+    int_status istatus = disable_int();
+    task_struct *now_thread = running_thread();
     now_thread->status = status;
     list_node *ready = list_pop_first(&ready_list);
     task_struct *next = node2entry(task_struct, general_tag, ready);
@@ -116,14 +118,14 @@ void thread_block(task_status status) {
     next->status = RUNNING;
     process_enable(next);
     switch_to(now_thread, next);
-    enable_int();
+    set_int_status(istatus);
 }
 
 void thread_unblock(task_struct *pthread) {
     // 将其加入到 ready 队列最前
-    disable_int();
+    int_status istatus = disable_int();
     ASSERT(!find_node(&ready_list, &pthread->general_tag));
     pthread->status = READY;
     list_add_first(&ready_list, &pthread->general_tag);
-    enable_int();
+    set_int_status(istatus);
 }

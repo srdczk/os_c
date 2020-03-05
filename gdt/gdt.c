@@ -56,3 +56,7 @@ void update_esp0(u32 esp0) {
     tss.esp0 = esp0;
 }
 
+u32 get_esp0() {
+    return tss.esp0;
+}
+

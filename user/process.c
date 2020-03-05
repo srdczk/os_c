@@ -52,7 +52,7 @@ void start_process(void *func) {
     u32 *esp = (u32 *)((u32) pthread + PAGE_SIZE);
     *(--esp)  = USER_DS;
     // 先设置用户栈底 为用户空间申请的0xc0000000 - 0x1000 + 0x1000, 先只调度一个用户进程
-    *(--esp) = ((u32)(get_user_page(USER_STACK_TOP)) + 0x1000);
+    *(--esp) = ((u32)(sync_get_user_page(USER_STACK_TOP)) + 0x1000);
     *(--esp) = EFLAGS_IF_1 | EFLAGS_MBS | EFLAGS_IOPL_0;
     *(--esp) = USER_CS;
     *(--esp) = (u32) func;

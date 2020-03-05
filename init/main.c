@@ -1,5 +1,6 @@
 #include "../include/console.h"
 #include "../include/keyboard.h"
+#include "../include/stdio.h"
 #include "../include/sync.h"
 #include "../include/pmm.h"
 #include "../include/list.h"
@@ -54,27 +55,38 @@ void thread(void *arg) {
     }
 }
 
+semaphore x, y;
+
+//lock lck;
+
+int p = 0;
+
 void thread_a(void *arg) {
-    console_print_dec(sys_getpid(NULL), MAGENTA);
-    console_print("\n");
-    while (1);
+    while (1) {
+        sem_down(&x);
+        console_print_color("TB ", GREEN);
+        sem_up(&y);
+    }
 }
 
 void thread_b(void *arg) {
-    console_print_dec(23/*sys_getpid(NULL)*/, WHITE);
-    console_print("\n");
-    while (1);
+    while (1) {
+        sem_down(&y);
+        console_print_color("TA ", RED);
+        sem_up(&x);
+    }
 }
 
 void u_proc_a() {
-    console_print_dec(getpid(), GREEN);
-    console_print("\n");
-    while (1);
+    while (1) {
+        console_print("SIMA");
+    }
 }
 
 void u_proc_b() {
-    write("PROCB\n");
-    while (1) ;
+    while (1) {
+        printf("PB %x\n", 0x345);
+    }
 }
 
 
@@ -85,9 +97,10 @@ void kernel_init() {
     idt_init();
     pmm_init();
     kernel_thread_init();
-    thread_start("ta", 23, thread_a, NULL);
-//    thread_start("tb", 23, thread_b, NULL);
-    process_exec(u_proc_a, "pa");
+    sem_init(&x, 1);
+    sem_init(&y, 0);
+    thread_start("ta", 23, thread_b, NULL);
+    thread_start("tb", 23, thread_a, NULL);
     process_exec(u_proc_b, "pb");
     enable_int();
     while (1) {

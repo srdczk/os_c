@@ -18,4 +18,3 @@ void sem_init(semaphore *sem, u32 val);
 void sem_down(semaphore *sem);
 
 void sem_up(semaphore *sem);
-

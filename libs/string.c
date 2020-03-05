@@ -24,7 +24,7 @@ int memcmp(const char *a, const char *b, int len) {
 
 char *strcpy(const char *src, char *des) {
     char *res = des;
-    while (*des++ == *src++);
+    while (*des++ = *src++);
     return res;
 }
 

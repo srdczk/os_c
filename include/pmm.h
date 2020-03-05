@@ -33,6 +33,7 @@
 extern u8 kernel_start[];
 extern u8 kernel_end[];
 extern u32 kernel_pde[];
+//extern semaphore mem_sem;
 typedef struct {
     bitmap bmap;
     u32 addr_start;
@@ -66,6 +67,8 @@ void *kmalloc_page(u32 cnt, u32 *pde);
 void *umalloc_page(u32 cnt);
 
 void *get_user_page(u32 va);
+
+void *sync_get_user_page(u32 va);
 
 u32 va2pa(u32 va);
 
