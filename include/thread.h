@@ -1,6 +1,7 @@
 #pragma once
 
 #include "types.h"
+#include "arena.h"
 #include "list.h"
 #include "pmm.h"
 
@@ -45,6 +46,8 @@ typedef struct {
     u32 pgdir; // 进程持有, 自己的页表(虚拟地址)
     // 用户进程虚拟内存的bitmap, 用于 malloc
     pool user_pool;
+    // 用户进程arena 描述 -> 用于 malloc
+    arena_desc user_arena[DESC_NUM];
     // 魔数, 检测栈是否溢出
     u32 stack_magic;
 } task_struct;

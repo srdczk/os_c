@@ -6,10 +6,9 @@
 #include "thread.h"
 
 #define DEFAULT_PRIO 31
-// 用户进程申请内存的起始位置
-#define USER_OFFSET 0x00804800
-// 计算存储位图需要多少页
-#define DIV_ROUND_UP(X, Y) ((X + Y - 1) / (Y))
+// 用户进程申请内存的起始位置, 页面要对齐
+#define USER_OFFSET 0x00800000
+
 
 void print();
 

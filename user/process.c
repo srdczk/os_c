@@ -113,6 +113,8 @@ void process_exec(void *func, char *name) {
     user_pool_init(thread);
     thread_create(thread, start_process, func);
     thread->pgdir = (u32) create_pde();
+    // 初始化 进程 arena 描述符号
+    area_desc_init(thread->user_arena);
     list_add_last(&ready_list, &thread->general_tag);
     list_add_last(&global_list, &thread->global_tag);
 }

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "arena.h"
 #include "bitmap.h"
 #include "multiboot.h"
 
@@ -29,6 +30,8 @@
 #define KERNEL_SPACE_SIZE 0x40000000
 
 #define PTE_OFFSET 0xffc00000
+// 向上取整
+#define DIV_ROUND_UP(X, Y) ((X + Y - 1) / (Y))
 
 extern u8 kernel_start[];
 extern u8 kernel_end[];
@@ -62,6 +65,8 @@ void pmm_init();
 
 void map(u32 va, u32 *pde, u32 flags);
 
+void unmap(u32 va);
+
 void *kmalloc_page(u32 cnt, u32 *pde);
 
 void *umalloc_page(u32 cnt);
@@ -71,4 +76,8 @@ void *get_user_page(u32 va);
 void *sync_get_user_page(u32 va);
 
 u32 va2pa(u32 va);
+
+void *pmm_malloc(u32 size);
+
+void pmm_free(void *ptr);
 

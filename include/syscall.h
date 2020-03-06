@@ -5,9 +5,12 @@
 
 #include "types.h"
 #include "idt.h"
+#include "pmm.h"
 
 #define SYS_GETPID 0
 #define SYS_WRITE 1
+#define SYS_MALLOC 2
+#define SYS_FREE 3
 // 最多 32 个 系统调用
 #define SYSCALL_SIZE 0x20
 
@@ -35,8 +38,6 @@
      retval;               \
  })
 
-
-
 u32 sys_getpid(u32 *arg);
 
 u32 getpid();
@@ -44,6 +45,14 @@ u32 getpid();
 u32 sys_write(u32 *arg);
 
 u32 write(char *str);
+
+u32 sys_malloc(u32 *arg);
+
+void *malloc(u32 size);
+
+u32 sys_free(u32 *arg);
+
+void free(void *ptr);
 
 void syscall(int_frame *tf);
 

@@ -62,31 +62,41 @@ semaphore x, y;
 int p = 0;
 
 void thread_a(void *arg) {
-    while (1) {
-        sem_down(&x);
-        console_print_color("TB ", GREEN);
-        sem_up(&y);
-    }
+    void *x = pmm_malloc(256);
+    void *y = pmm_malloc(255);
+    void *z = pmm_malloc(254);
+    console_print("AX:"); console_print_hex((u32) x, GREEN);
+    console_print("AY:"); console_print_hex((u32) y, MAGENTA);
+    console_print("AZ:"); console_print_hex((u32) z, RED);
+    int cpu_delay = 100000;
+    while (cpu_delay-- > 0);
+    pmm_free(x);
+    pmm_free(y);
+    pmm_free(z);
+    console_print_color("NIMASILE\n", WHITE);
+    while (1);
 }
 
 void thread_b(void *arg) {
-    while (1) {
-        sem_down(&y);
-        console_print_color("TA ", RED);
-        sem_up(&x);
-    }
+    while (1);
 }
 
 void u_proc_a() {
-    while (1) {
-        console_print("SIMA");
-    }
+    while (1);
 }
 
 void u_proc_b() {
-    while (1) {
-        printf("PB %x\n", 0x345);
-    }
+    void *addr = malloc(63);
+    printf("PPP1:0x%x\n", addr);
+    free(addr);
+    addr = malloc(127);
+    printf("PPP1:0x%x\n", addr);
+    void *addr2 = malloc(36);
+    printf("PPP2:0x%x\n", addr2);
+    free(addr);
+    free(addr2);
+    printf("LAST:0x%x\n", malloc(33));
+    while (1);
 }
 
 
@@ -97,9 +107,7 @@ void kernel_init() {
     idt_init();
     pmm_init();
     kernel_thread_init();
-    sem_init(&x, 1);
-    sem_init(&y, 0);
-    thread_start("ta", 23, thread_b, NULL);
+//    thread_start("ta", 23, thread_b, NULL);
     thread_start("tb", 23, thread_a, NULL);
     process_exec(u_proc_b, "pb");
     enable_int();
