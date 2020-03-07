@@ -106,6 +106,7 @@ void kernel_init() {
     console_clear();
     gdt_init();
     clock_init(FREQUENCY);
+    keyboard_init();
     idt_init();
     pmm_init();
     kernel_thread_init();

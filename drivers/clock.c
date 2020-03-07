@@ -19,7 +19,7 @@ void clock_init(u32 fre) {
     ticks = 0;
 
     // 设置 中断可用
-//    irq_enable(IRQ_CLOCK);
+    irq_enable(IRQ_CLOCK);
 
 }
 

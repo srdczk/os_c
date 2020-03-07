@@ -59,21 +59,21 @@ int_status disable_int() {
 
 void idt_init() {
 
-//    irq_init();
-
-    outb (PIC_M_CTRL, 0x11);
-    outb (PIC_M_DATA, 0x20);
-    outb (PIC_M_DATA, 0x04);
-    outb (PIC_M_DATA, 0x01);
-    //初始化从片
-    outb (PIC_S_CTRL, 0x11);
-    outb (PIC_S_DATA, 0x28);
-    outb (PIC_S_DATA, 0x02);
-    outb (PIC_S_DATA, 0x01);
-
-    //打开键盘中断与时钟中断
-    outb(PIC_M_DATA, 0xf8);
-    outb(PIC_S_DATA, 0xbf);
+    irq_init();
+//
+//    outb (PIC_M_CTRL, 0x11);
+//    outb (PIC_M_DATA, 0x20);
+//    outb (PIC_M_DATA, 0x04);
+//    outb (PIC_M_DATA, 0x01);
+//    //初始化从片
+//    outb (PIC_S_CTRL, 0x11);
+//    outb (PIC_S_DATA, 0x28);
+//    outb (PIC_S_DATA, 0x02);
+//    outb (PIC_S_DATA, 0x01);
+//
+//    //打开键盘中断与时钟中断
+//    outb(PIC_M_DATA, 0xf8);
+//    outb(PIC_S_DATA, 0xbf);
 
 
     int i;
@@ -130,7 +130,6 @@ void int_dispatch(int_frame *tf) {
             PANIC(msg);
         }
     } else if (tf->int_no < 0x80) {
-        if (tf->int_no != IRQ_BEGIN) kprintf("IRQ: %d", tf->int_no);
         if (tf->int_no == IRQ_BEGIN) {
             ticks++;
             schedule();
@@ -138,8 +137,7 @@ void int_dispatch(int_frame *tf) {
             keyboard_handler(inb(KEY_PORT));
         } else if (tf->int_no == IRQ_IDE1) {
             kprintf("HD!-> INTR\n");
-            // 初始化硬盘结构
-            hd_handler((u8) tf->int_no);
+            // 硬盘结构
         }
     } else syscall(tf);
 }

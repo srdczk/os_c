@@ -11,9 +11,9 @@ all_int:
     mov ds, ax
     mov es, ax
 
-    mov al, 0x20
-    out 0xa0, al
-    out 0x20, al
+    ;mov al, 0x20
+    ;out 0xa0, al
+    ;out 0x20, al
 
     push esp ;指针
     call int_dispatch

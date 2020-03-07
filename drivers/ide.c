@@ -1,296 +1,162 @@
-//
-// Created by srdczk on 20-3-7.
-//
-
 #include "../include/ide.h"
-#include "../include/debug.h"
-#include "../include/irq.h"
-#include "../include/stdio.h"
 #include "../include/x86.h"
-
-// 硬盘各寄存器的端口号
-#define reg_data(channel)	 (channel->port_base + 0)
-#define reg_error(channel)	 (channel->port_base + 1)
-#define reg_sect_cnt(channel)	 (channel->port_base + 2)
-#define reg_lba_l(channel)	 (channel->port_base + 3)
-#define reg_lba_m(channel)	 (channel->port_base + 4)
-#define reg_lba_h(channel)	 (channel->port_base + 5)
-#define reg_dev(channel)	 (channel->port_base + 6)
-#define reg_status(channel)	 (channel->port_base + 7)
-#define reg_cmd(channel)	 (reg_status(channel))
-#define reg_alt_status(channel)  (channel->port_base + 0x206)
-#define reg_ctl(channel)	 reg_alt_status(channel)
-
-
-// 硬盘忙
-#define BIT_STAT_BSY	 (1 << 7)
-//驱动器就绪
-#define BIT_STAT_DRDY	 (1 << 6)
-//数据就绪
-#define BIT_STAT_DRQ	 (1 << 3)
-
-#define BIT_DEV_MBS	0xa0
-#define BIT_DEV_LBA	0x40
-#define BIT_DEV_DEV	0x10
-
-#define CMD_IDENTIFY	   0xec
-// 读扇区
-#define CMD_READ_SECTOR	   0x20
-// 写扇区
-#define CMD_WRITE_SECTOR   0x30
-// 80MB 硬盘, 最大扇区
-#define max_lba ((80*1024*1024/512) - 1)
-// 通道数量 (一个通道两个硬盘)
-u8 channel_num;
-ide_channel channels[2];
-// 总拓展分区的起始lba
-u32 ext_lba_base = 0;
-u8 p_no = 0, l_no = 0;
-// 分区链表
-list partition_list;
+#include "../include/pmm.h"
 
 #define IRQ_IDE1 0x2e
+#define IRQ_IDE2 0x2f
 
-//区表结构体
-typedef struct {
-    u8  bootable;
-    // 磁头号,起始扇区和起始柱面
-    u8  start_head;
-    u8  start_sec;
-    u8  start_chs;
-    //分区类型
-    u8  fs_type;
-    // 磁头号，结束扇区，结束柱面
-    u8  end_head;
-    u8  end_sec;
-    u8  end_chs;
-    //起始扇区lba
-    u32 start_lba;
-    //扇区数目
-    u32 sec_cnt;
-} __attribute__ ((packed)) partition_table_entry;
+#define SECTSIZE 512
 
-//引导扇区
+#define ISA_DATA                0x00
+#define ISA_ERROR               0x01
+#define ISA_PRECOMP             0x01
+#define ISA_CTRL                0x02
+#define ISA_SECCNT              0x02
+#define ISA_SECTOR              0x03
+#define ISA_CYL_LO              0x04
+#define ISA_CYL_HI              0x05
+#define ISA_SDH                 0x06
+#define ISA_COMMAND             0x07
+#define ISA_STATUS              0x07
+
+#define IDE_BSY                 0x80
+#define IDE_DRDY                0x40
+#define IDE_DF                  0x20
+#define IDE_DRQ                 0x08
+#define IDE_ERR                 0x01
+
+#define IDE_CMD_READ            0x20
+#define IDE_CMD_WRITE           0x30
+#define IDE_CMD_IDENTIFY        0xEC
+
+#define IDE_IDENT_SECTORS       20
+#define IDE_IDENT_MODEL         54
+#define IDE_IDENT_CAPABILITIES  98
+#define IDE_IDENT_CMDSETS       164
+#define IDE_IDENT_MAX_LBA       120
+#define IDE_IDENT_MAX_LBA_EXT   200
+
+#define IO_BASE0                0x1F0
+#define IO_BASE1                0x170
+#define IO_CTRL0                0x3F4
+#define IO_CTRL1                0x374
+
+#define MAX_IDE                 4
+#define MAX_NSECS               128
+#define MAX_DISK_NSECS          0x10000000U
+#define VALID_IDE(ideno)        (((ideno) >= 0) && ((ideno) < MAX_IDE) && (ide_devices[ideno].valid))
+
+
+channel channels[2] = {
+        {IO_BASE0, IO_CTRL0},
+        {IO_BASE1, IO_CTRL1}
+};
+
+#define IO_BASE(ideno)          (channels[(ideno) >> 1].base)
+#define IO_CTRL(ideno)          (channels[(ideno) >> 1].ctrl)
+
+// 监听两个通道, 每个通道最多 ->
+ide_device ide_devices[MAX_IDE];
+
+u32 ext_lba_base = 0;
+
+// 主分区和逻辑分区编号
+u8 p_no = 0, l_no = 0;
+
+// 分区链表
+list part_list;
+
+// 分区表项目
 typedef struct {
-    //代码部分
-    u8  other[446];
-    //分区表项
-    partition_table_entry partition_table[4];
-    //结束标志 0x55aa(小端0xaa55)
+        // 是否 引导
+        u8  bootable;
+        //起始磁头号,扇区,柱面
+        u8  start_head;
+        u8  start_sec;
+        u8  start_chs;
+        //分区类型
+        u8  fs_type;
+        //结束磁头号,扇区,柱面
+        u8  end_head;
+        u8  end_sec;
+        u8  end_chs;
+        //起始扇区lba
+        u32 start_lba;
+        //扇区数目
+        u32 sec_cnt;
+} __attribute__ ((packed)) partition_entry;
+
+// 引导扇区
+typedef struct {
+    // 代码
+    u8 other[446];
+    // 分区表项
+    partition_entry partition_table[4];
+    // 结束符 0x55AA, (小端法 16 进制直接0xAA55)
     u16 signature;
 } __attribute__ ((packed)) boot_sector;
 
-void ide1_init() {
-    irq_enable(IRQ_IDE1);
-}
-
-// 写入
-static void select_disk(disk* hd) {
-    u8 reg = BIT_DEV_LBA | BIT_DEV_MBS;
-    if (!hd->dev_no) reg |= BIT_DEV_DEV;
-    outb(reg_dev(hd->my_channel), reg);
-}
-// 写入起始扇区地址和读写扇区数
-static void select_sector(disk* hd, u32 lba, u8 sec_cnt) {
-    ide_channel* channel = hd->my_channel;
-
-    outb(reg_sect_cnt(channel), sec_cnt);
-
-    outb(reg_lba_l(channel), lba);
-    outb(reg_lba_m(channel), (lba >> 8));
-    outb(reg_lba_h(channel), (lba >> 16));
-
-    outb(reg_dev(channel), BIT_DEV_MBS | BIT_DEV_LBA | (!hd->dev_no ? BIT_DEV_DEV : 0) | lba >> 24);
-}
-
-// 向channel 发送命令
-static void cmd_out(ide_channel* channel, u8 cmd) {
-    channel->expecting_intr = 1;
-    outb(reg_cmd(channel), cmd);
-}
-
-// 读入 sec_cnt 个扇区的数据
-static void read_from_sector(disk* hd, void* buf, u8 sec_cnt) {
-    u32 size;
-    if (!sec_cnt) size = 256 * 512;
-    else size = sec_cnt * 512;
-    insw(reg_data(hd->my_channel), buf, size / 2);
-}
-
-// 写入硬盘
-static void write_to_sector(disk* hd, void* buf, u8 sec_cnt) {
-    u32 size;
-    if (!sec_cnt) size = 256 * 512;
-    else size = sec_cnt * 512;
-    outsw(reg_data(hd->my_channel), buf, size / 2);
-}
-
-// 等待 30s , 确保数据传输完成
-static bool busy_wait(disk *hd) {
-    ide_channel *channel = hd->my_channel;
-    s16 time = 30 * 1000;
-    while ((time -= 10) >= 0) {
-        kprintf("%x\n", reg_alt_status(channel));
-        u8 res = inb(reg_status(channel));
-        kprintf("%d\n", res);
-        if (!(res & BIT_STAT_BSY)) return (res & BIT_STAT_DRQ);
-        else mil_sleep(10);
+static int ide_wait_ready(u16 iobase, bool check_error) {
+    int r;
+    // 阻塞
+    while ((r = inb(iobase + ISA_STATUS)) & IDE_BSY);
+    if (check_error && (r & (IDE_DF | IDE_ERR)) != 0) {
+        return -1;
     }
     return 0;
 }
 
-// 硬盘读取 sec_cnt 个扇区
-void ide_read(disk* hd, u32 lba, void* buf, u32 sec_cnt) {
-    // 上锁
-    sem_down(&hd->my_channel->sema);
-
-    select_disk(hd);
-    // 要转移的扇区数
-    u32 secs_op;
-    // 完成的扇区数
-    u32 secs_done = 0;
-    while (secs_done < sec_cnt) {
-        if (secs_done + 256 <= sec_cnt) secs_op = 256;
-        else secs_op = sec_cnt - secs_done;
-
-        //设置待读入 参数
-        select_sector(hd, lba + secs_done, secs_op);
-        // 指令设置 -> 读取
-        cmd_out(hd->my_channel, CMD_READ_SECTOR);
-        // 读写数据时, 阻塞自己 -> 中断处理中会 up
-        sem_down(&hd->my_channel->semb);
-
-        if (!busy_wait(hd)) {
-            char error[64];
-            sprintf(error, "%s read sector %d failed!!!!!!\n", hd->name, lba);
-            PANIC(error);
-        }
-        //转移数据
-        read_from_sector(hd, (void*)((u32)buf + secs_done * 512), secs_op);
-        secs_done += secs_op;
-    }
-    // 解锁
-    sem_up(&hd->my_channel->sema);
-}
-
-// 向硬盘写入数据
-void ide_write(disk* hd, u32 lba, void* buf, u32 sec_cnt) {
-    sem_down(&hd->my_channel->sema);
-
-    select_disk(hd);
-
-    u32 secs_op;
-    u32 secs_done = 0;
-    while(secs_done < sec_cnt) {
-        if (secs_done + 256 <= sec_cnt) secs_op = 256;
-        else secs_op = sec_cnt - secs_done;
-
-        select_sector(hd, lba + secs_done, secs_op);
-
-        cmd_out(hd->my_channel, CMD_WRITE_SECTOR);
-
-        // 开始写数据
-        if (!busy_wait(hd)) {
-            char error[64];
-            sprintf(error, "%s write sector %d failed!!!!!!\n", hd->name, lba);
-            PANIC(error);
-        }
-
-        write_to_sector(hd, (void*)((u32) buf + secs_done * 512), secs_op);
-        // 在硬盘响应期间阻塞自己
-        sem_down(&hd->my_channel->semb);
-        secs_done += secs_op;
-    }
-    // 解锁
-    sem_up(&hd->my_channel->sema);
-}
-
-void hd_handler(u8 irq_no) {
-    // 中断处理
-    // 一般只 处理 单条通道
-    ide_channel *channel = &channels[irq_no - 0x2e];
-    if (channel->expecting_intr) {
-        channel->expecting_intr = 0;
-        sem_up(&channel->semb);
-        // 标记此次中断已经被处理, 并且可以开始新的中断
-        inb(reg_status(channel));
-    }
-}
-
-static void swap_pairs_bytes(const char *des, char *res, u32 len) {
-    int i;
-    for (i = 0; i < len; i += 2) {
-        res[i + 1] = *des++;
-        res[i] = *des++;
-    }
-    res[i] = '\0';
-}
-
-// 获取硬盘的参数信息
-static void identify_disk(disk* hd) {
-    char id_info[512];
-    select_disk(hd);
-    cmd_out(hd->my_channel, CMD_IDENTIFY);
-    kprintf("HD:%s\n", hd->name);
-//    sem_down(&hd->my_channel->semb);
-//
-//    if(!busy_wait(hd)){
-//        char error[64];
-//        sprintf(error, "%s identify failed!!!!!!\n", hd->name);
-//        PANIC(error);
-//    }
-    read_from_sector(hd, id_info, 1);
-
-    // 读取 一个扇区
-
-    char buf[64];
-    u8 sn_start = 10 * 2, sn_len = 20, md_start = 27 * 2, md_len = 40;
-
-    swap_pairs_bytes(&id_info[sn_start], buf, sn_len);
-
-    kprintf("   disk %s info:\n      SN: %s\n", hd->name, buf);
-    memset(buf, 0, sizeof(buf));
-    kprintf(&id_info[md_start], buf, md_len);
-    kprintf("      MODULE: %s\n", buf);
-    u32 sectors = *(u32 *)&id_info[60 * 2];
-    kprintf("      SECTORS: %d\n", sectors);
-    kprintf("      CAPACITY: %dMB\n", sectors * 512 / 1024 / 1024);
-}
-
-
-//扫描硬盘特定扇区中的所有分区
-static void partition_scan(disk* hd, u32 ext_lba) {
-    boot_sector* bs = pmm_malloc(sizeof(boot_sector));
-    ide_read(hd, ext_lba, bs, 1);
-    partition_table_entry* p = bs->partition_table;
+// 扫描硬盘分区
+static void partition_scan(u16 devno, u32 ext_lba) {
+    char name[] = "sda";
+    boot_sector *bs = pmm_malloc(sizeof(boot_sector));
+    kprintf("bs:%x\n", (u32)bs);
+    // 读入引导扇区
+    int res = ide_read_secs(devno, ext_lba, bs, 1);
+    kprintf("res:%d\n", res);
+    kprintf("YES\n");
+    partition_entry *p = bs->partition_table;
+    kprintf("start:lba0x%x\n", p->start_lba);
+    kprintf("sig:%x\n", bs->signature);
+    kprintf("p->type:%d\n", p->fs_type);
     u8 i = 0;
-    //遍历分区表
+    // 深度优先搜索所有分区
     while (i++ < 4) {
-        //如果是扩展分区
-        if (p->fs_type == 0x5){
-            if (ext_lba_base != 0) partition_scan(hd, p->start_lba + ext_lba_base);
-            else {
+        // 拓展分区
+        if (p->fs_type == 0x5) {
+            // 如果 已经
+            if (ext_lba_base != 0) {
+                kprintf("X1\n");
+                partition_scan(devno, p->start_lba + ext_lba_base);
+            } else {
+                kprintf("X2\n");
                 ext_lba_base = p->start_lba;
-                partition_scan(hd, p->start_lba);
+                partition_scan(devno, p->start_lba);
             }
-        }
-        else if (p->fs_type != 0) { // 有效分区
-            if (ext_lba == 0) {	 // 主分区
-                hd->prim_parts[p_no].start_lba = ext_lba + p->start_lba;
-                hd->prim_parts[p_no].sec_cnt = p->sec_cnt;
-                hd->prim_parts[p_no].my_disk = hd;
-                list_add_last(&partition_list, &hd->prim_parts[p_no].part_tag);
-                sprintf(hd->prim_parts[p_no].name, "%s%d", hd->name, p_no + 1);
+            // 有效分区
+        } else if (p->fs_type != 0) {
+            if(ext_lba == 0) {
+                // 主分区
+                kprintf("X3\n");
+                ide_devices[devno].prim_parts[p_no].start_lba = ext_lba + p->start_lba;
+                ide_devices[devno].prim_parts[p_no].sec_num = p->sec_cnt;
+                ide_devices[devno].prim_parts[p_no].devno = devno;
+                kprintf("NIMA\n");
+                list_add_last(&part_list, &ide_devices[devno].prim_parts[p_no].part_tag);
+                sprintf(ide_devices[devno].prim_parts[p_no].name, "%s%d", name, p_no + 1);
+                kprintf("WULIU\n");
                 p_no++;
             } else {
-                hd->logic_parts[l_no].start_lba = ext_lba + p->start_lba;
-                hd->logic_parts[l_no].sec_cnt = p->sec_cnt;
-                hd->logic_parts[l_no].my_disk = hd;
-                list_add_last(&partition_list, &hd->logic_parts[l_no].part_tag);
-                sprintf(hd->logic_parts[l_no].name, "%s%d", hd->name, l_no + 5);	 // 逻辑分区数字是从5开始,主分区是1～4.
+                kprintf("X4\n");
+                // 逻辑分区
+                ide_devices[devno].logic_parts[l_no].start_lba =
+                ide_devices[devno].logic_parts[l_no].start_lba = ext_lba + p->start_lba;
+                ide_devices[devno].logic_parts[l_no].sec_num = p->sec_cnt;
+                ide_devices[devno].logic_parts[l_no].devno = devno;
+                list_add_last(&part_list, &ide_devices[devno].logic_parts[l_no].part_tag);
+                sprintf(ide_devices[devno].logic_parts[l_no].name, "%s%d", name, l_no + 5);
                 l_no++;
-                if (l_no >= 8)    // 只支持8个逻辑分区,避免数组越界
-                    return;
+                if (l_no >= 8) return;
             }
         }
         p++;
@@ -298,60 +164,121 @@ static void partition_scan(disk* hd, u32 ext_lba) {
     pmm_free(bs);
 }
 
-
-//typedef u8 list_func(list_node *, void *);
-// 打印分区信息
 static bool partition_info(list_node *node, void *arg) {
-    partition* part = node2entry(partition, part_tag, node);
-    kprintf("   %s start_lba:0x%x, sec_cnt:0x%x\n",part->name, part->start_lba, part->sec_cnt);
+    partition *part = node2entry(partition, part_tag, node);
+    kprintf("    %s start_lba:0x%x, sec_num:0x%x\n", part->name, part->start_lba, part->sec_num);
     return 0;
 }
 
-
 void ide_init() {
-    kprintf("Start init ide\n");
-    // 硬盘信息存储在 物理地址0x475 -> 映射到 偏移0xc0000000上
-    u8 hd_num = *((u8 *)(KERNEL_PAGE_OFFSET + 0x475));
-    kprintf("Hd num: %d\n", hd_num);
-    channel_num = DIV_ROUND_UP(hd_num, 2);
-    kprintf("Channel num: %d\n", channel_num);
-    ide_channel *channel;
-    u8 cnt = 0;
-    u8 dev_no = 0;
-    // 初始化 处理 每个通道上的硬盘
-    while (cnt < channel_num) {
-        channel = channels + cnt;
-        sprintf(channel->name, "ide%d", cnt);
-        // 为每个通道初始化 端口 中断
-        switch (cnt) {
-            case 0:
-                // 1通道 -> 起始端口号
-                channel->port_base = 0x1f0;
-                channel->irq_no = 0x20 + 14;
-                break;
-            case 1:
-                channel->port_base = 0x170;
-                channel->irq_no = 0x20 + 15;
-                break;
+    u16 ideno, iobase;
+    for (ideno = 0; ideno < MAX_IDE; ideno ++) {
+        ide_devices[ideno].valid = 0;
+
+        iobase = IO_BASE(ideno);
+
+        ide_wait_ready(iobase, 0);
+
+        outb(iobase + ISA_SDH, 0xe0 | ((ideno & 1) << 4));
+        ide_wait_ready(iobase, 0);
+
+        outb(iobase + ISA_COMMAND, IDE_CMD_IDENTIFY);
+        ide_wait_ready(iobase, 0);
+
+        if (inb(iobase + ISA_STATUS) == 0 || ide_wait_ready(iobase, 1) != 0) {
+            continue ;
         }
-        channel->expecting_intr = 0;
-        // 用来上锁
-        sem_init(&channel->sema, 1);
-        // 用来阻塞自己, 设为 0
-        sem_init(&channel->semb, 0);
-        // 读取通道上硬盘
-        disk *hd = &channel->devices[dev_no];
-        hd->my_channel = channel;
-        hd->dev_no = dev_no;
-        sprintf(hd->name, "sd%c", (char)('a' + cnt * 2 + dev_no));
-        identify_disk(hd);
-        partition_scan(hd, 0);
-        p_no = 0;
-        l_no = 0;
-        dev_no++;
-        cnt++;
+
+        ide_devices[ideno].valid = 1;
+
+        u32 buffer[128];
+        insw(iobase + ISA_DATA, buffer, sizeof(buffer) / sizeof(u32));
+
+        u8 *ident = (u8 *)buffer;
+        u32 sectors;
+        u32 cmdsets = *(u32 *)(ident + IDE_IDENT_CMDSETS);
+        if (cmdsets & (1 << 26)) sectors = *(u32 *)(ident + IDE_IDENT_MAX_LBA_EXT);
+        else sectors = *(u32 *)(ident + IDE_IDENT_MAX_LBA);
+        ide_devices[ideno].sets = cmdsets;
+        ide_devices[ideno].size = sectors;
+
+        u8 *model = ide_devices[ideno].model, *data = ident + IDE_IDENT_MODEL;
+        u32 i, length = 40;
+        for (i = 0; i < length; i += 2) {
+            model[i] = data[i + 1], model[i + 1] = data[i];
+        }
+        do {
+            model[i] = '\0';
+        } while (i -- > 0 && model[i] == ' ');
+        if (!ide_devices[ideno].size) break;
+        kprintf("ide %d %d(sectors) '%s'\n", ideno, ide_devices[ideno].size, ide_devices[ideno].model);
     }
-    kprintf("\n all partition: \n");
-    list_traversal(&partition_list, partition_info, (void *)NULL);
+    irq_enable(IRQ_IDE1);
+    irq_enable(IRQ_IDE2);
+    // 初始化 链表
+    list_init(&part_list);
+    // 处理 0 号硬盘, 检查分区 情况
+    partition_scan(0, 0);
+    list_traversal(&part_list, partition_info, NULL);
+    kprintf("ide_init done\n");
 }
 
+bool ide_device_valid(u16 ideno) {
+    return VALID_IDE(ideno);
+}
+
+u32 ide_device_size(u16 ideno) {
+    if (ide_device_valid(ideno)) {
+        return ide_devices[ideno].size;
+    }
+    return 0;
+}
+
+int ide_read_secs(u16 ideno, u32 secno, void *dst, u32 nsecs) {
+    u16 iobase = IO_BASE(ideno), ioctrl = IO_CTRL(ideno);
+
+    ide_wait_ready(iobase, 0);
+
+    outb(ioctrl + ISA_CTRL, 0);
+    outb(iobase + ISA_SECCNT, nsecs);
+    outb(iobase + ISA_SECTOR, secno & 0xFF);
+    outb(iobase + ISA_CYL_LO, (secno >> 8) & 0xFF);
+    outb(iobase + ISA_CYL_HI, (secno >> 16) & 0xFF);
+    outb(iobase + ISA_SDH, 0xE0 | ((ideno & 1) << 4) | ((secno >> 24) & 0xF));
+    outb(iobase + ISA_COMMAND, IDE_CMD_READ);
+
+    int ret = 0;
+    for (; nsecs > 0; nsecs --, dst += SECTSIZE) {
+        if ((ret = ide_wait_ready(iobase, 1)) != 0) {
+            goto out;
+        }
+        insl(iobase, dst, SECTSIZE / sizeof(u32));
+    }
+
+    out:
+    return ret;
+}
+
+int ide_write_secs(u16 ideno, u32 secno, void *src, u32 nsecs) {
+    u16 iobase = IO_BASE(ideno), ioctrl = IO_CTRL(ideno);
+
+    ide_wait_ready(iobase, 0);
+
+    outb(ioctrl + ISA_CTRL, 0);
+    outb(iobase + ISA_SECCNT, nsecs);
+    outb(iobase + ISA_SECTOR, secno & 0xFF);
+    outb(iobase + ISA_CYL_LO, (secno >> 8) & 0xFF);
+    outb(iobase + ISA_CYL_HI, (secno >> 16) & 0xFF);
+    outb(iobase + ISA_SDH, 0xE0 | ((ideno & 1) << 4) | ((secno >> 24) & 0xF));
+    outb(iobase + ISA_COMMAND, IDE_CMD_WRITE);
+
+    int ret = 0;
+    for (; nsecs > 0; nsecs --, src += SECTSIZE) {
+        if ((ret = ide_wait_ready(iobase, 1)) != 0) {
+            goto out;
+        }
+        outsl(iobase, src, SECTSIZE / sizeof(u32));
+    }
+    out:
+    return ret;
+}

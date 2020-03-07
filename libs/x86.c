@@ -22,6 +22,25 @@ void insw(u16 port, void* addr, u32 word_cnt){
 void outw(u16 port, u16 data) {
     asm volatile ("outw %0, %1" :: "a" (data), "d" (port));
 }
+
+void insl(u32 port, void *addr, int cnt) {
+    asm volatile (
+    "cld;"
+    "repne; insl;"
+    : "=D" (addr), "=c" (cnt)
+    : "d" (port), "0" (addr), "1" (cnt)
+    : "memory", "cc");
+}
+
+void outsl(u32 port, void *addr, int cnt) {
+    asm volatile (
+    "cld;"
+    "repne; outsl;"
+    : "=S" (addr), "=c" (cnt)
+    : "d" (port), "0" (addr), "1" (cnt)
+    : "memory", "cc");
+}
+
 void sti() {
     asm volatile("sti");
 }
