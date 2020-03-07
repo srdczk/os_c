@@ -71,3 +71,5 @@ void thread_block(task_status status);
 
 void thread_unblock(task_struct *pthread);
 
+void thread_yield();
+

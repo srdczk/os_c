@@ -28,7 +28,7 @@ clean:
 	rm -rf $(ASM_OBJS) $(C_OBJS) zl_kernel
 
 qemu:
-	qemu-system-i386 -m 512M -kernel zl_kernel
+	qemu-system-i386 -hda hd80M.img -m 512M -kernel zl_kernel
 
 gdb:
 	qemu-system-i386 -S -s -m 512M -kernel zl_kernel &

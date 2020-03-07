@@ -1,6 +1,9 @@
 #include "../include/isr.h"
+#include "../include/ide.h"
+#include "../include/stdio.h"
 #include "../include/thread.h"
 #include "../include/console.h"
+#include "../include/irq.h"
 #include "../include/clock.h"
 #include "../include/debug.h"
 #include "../include/keyboard.h"
@@ -10,11 +13,21 @@
 #define IRQ_BEGIN 0x20
 #define IRQ_END 0x30
 #define TIMER_NUM 100
+#define IRQ_IDE1 0x2e
 
 #define PAGE_FAULT 0x0e
 // 如果开启了中断 eflags 第 9 位设 为 1
 #define IF_EFLAGS 0x00000200
 #define KEY_PORT 0x60
+
+//主片的控制端口，0x20
+#define PIC_M_CTRL 0x20
+//主片的数据端口，0x21
+#define PIC_M_DATA 0x21
+//从片的控制端口，0xa0
+#define PIC_S_CTRL 0xa0
+//从片的数据端口，0xa1
+#define PIC_S_DATA 0xa1
 
 static u32 cnt = 0;
 
@@ -45,24 +58,24 @@ int_status disable_int() {
 }
 
 void idt_init() {
-	// 初始化主片、从片
-	// 0001 0001
-	outb(0x20, 0x11);
-	outb(0xa0, 0x11);
 
-	outb(0x21, 0x20);
+//    irq_init();
 
-	outb(0xa1, 0x28);
+    outb (PIC_M_CTRL, 0x11);
+    outb (PIC_M_DATA, 0x20);
+    outb (PIC_M_DATA, 0x04);
+    outb (PIC_M_DATA, 0x01);
+    //初始化从片
+    outb (PIC_S_CTRL, 0x11);
+    outb (PIC_S_DATA, 0x28);
+    outb (PIC_S_DATA, 0x02);
+    outb (PIC_S_DATA, 0x01);
 
-	outb(0x21, 0x04);
+    //打开键盘中断与时钟中断
+    outb(PIC_M_DATA, 0xf8);
+    outb(PIC_S_DATA, 0xbf);
 
-	outb(0xa1, 0x02);
 
-	outb(0x21, 0x01);
-	outb(0xa1, 0x01);
-
-	outb(0x21, 0x0);
-	outb(0xa1, 0x0);
     int i;
     for (i = 0; i < 48; ++i) {
         set_idt_gate((u32) i, isrs[i], 0x08, 0x8e);
@@ -117,12 +130,16 @@ void int_dispatch(int_frame *tf) {
             PANIC(msg);
         }
     } else if (tf->int_no < 0x80) {
-        if (tf->int_no >= 40) outb(0xa0, 0x20);
-        outb(0x20, 0x20);
+        if (tf->int_no != IRQ_BEGIN) kprintf("IRQ: %d", tf->int_no);
         if (tf->int_no == IRQ_BEGIN) {
+            ticks++;
             schedule();
         } else if (tf->int_no == IRQ_BEGIN + 1) {
             keyboard_handler(inb(KEY_PORT));
+        } else if (tf->int_no == IRQ_IDE1) {
+            kprintf("HD!-> INTR\n");
+            // 初始化硬盘结构
+            hd_handler((u8) tf->int_no);
         }
     } else syscall(tf);
 }

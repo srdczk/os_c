@@ -5,6 +5,7 @@
 #include "../include/syscall.h"
 #include "../include/stdio.h"
 #include "../include/string.h"
+#include "../include/console.h"
 
 #define va_start(ap, x) ap = (va_list)&x
 #define va_arg(ap, x) *((x *)(ap += 4))
@@ -91,6 +92,16 @@ u32 printf(const char *format, ...) {
     vsprintf(buff, format, args);
     va_end(args);
     write(buff);
+    return strlen(buff);
+}
+
+u32 kprintf(const char *format, ...) {
+    va_list args;
+    va_start(args, format);
+    char buff[1024];
+    vsprintf(buff, format, args);
+    va_end(args);
+    console_print(buff);
     return strlen(buff);
 }
 

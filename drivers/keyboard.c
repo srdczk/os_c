@@ -1,4 +1,7 @@
 #include "../include/keyboard.h"
+#include "../include/irq.h"
+
+#define IRQ_KEYBOARD 0x21
 
 io_buffer kb_buffer;
 
@@ -95,6 +98,10 @@ static char keymap[][2] = {
     {' ', ' '},
     {caps_lock_char, caps_lock_char}
 };
+
+void keyboard_init() {
+    irq_enable(IRQ_KEYBOARD);
+}
 
 void kbuffer_init() {
     buffer_init(&kb_buffer);

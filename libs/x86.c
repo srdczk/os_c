@@ -1,14 +1,24 @@
 #include "../include/x86.h"
 
-u8 inb(u16 port) {
+u8 inb(u16 port){
     u8 data;
-    asm volatile ("inb %1, %0" : "=a" (data) : "d" (port));
+    asm volatile ("inb %w1, %b0" : "=a" (data) : "Nd" (port));
     return data;
 }
 
 void outb(u16 port, u8 data) {
-    asm volatile ("outb %0, %1" :: "a" (data), "d" (port));
+asm volatile ("outb %b0, %w1" : : "a" (data), "Nd" (port));
 }
+
+
+void outsw(u16 port, const void* addr, u32 word_cnt) {
+    asm volatile ("cld; rep outsw" : "+S" (addr), "+c" (word_cnt) : "d" (port));
+}
+
+void insw(u16 port, void* addr, u32 word_cnt){
+    asm volatile ("cld; rep insw" : "+D" (addr), "+c" (word_cnt) : "d" (port) : "memory");
+}
+
 void outw(u16 port, u16 data) {
     asm volatile ("outw %0, %1" :: "a" (data), "d" (port));
 }

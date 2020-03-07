@@ -3,6 +3,7 @@
 #include "../include/stdio.h"
 #include "../include/sync.h"
 #include "../include/pmm.h"
+#include "../include/ide.h"
 #include "../include/list.h"
 #include "../include/debug.h"
 #include "../include/clock.h"
@@ -78,6 +79,7 @@ void thread_a(void *arg) {
 }
 
 void thread_b(void *arg) {
+    kprintf("NIMASILE\n");
     while (1);
 }
 
@@ -103,17 +105,15 @@ void u_proc_b() {
 void kernel_init() {
     console_clear();
     gdt_init();
-    clock_init(1000);
+    clock_init(FREQUENCY);
     idt_init();
     pmm_init();
     kernel_thread_init();
-//    thread_start("ta", 23, thread_b, NULL);
-    thread_start("tb", 23, thread_a, NULL);
-    process_exec(u_proc_b, "pb");
+    ide_init();
     enable_int();
-    while (1) {
-        asm volatile ("hlt");
-    }
+    mil_sleep(2000);
+    thread_start("tb", 30, thread_b, NULL);
+    while (1);
 }
 
 

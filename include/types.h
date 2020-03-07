@@ -1,5 +1,6 @@
 #pragma once
 
+
 #define NULL 0
 
 #define EFLAGS_MBS (1 << 1)
@@ -15,6 +16,7 @@ typedef unsigned short u16;
 typedef short s16;
 typedef unsigned char u8;
 typedef char s8;
+typedef u8 bool;
 
 typedef struct {
     u16 limit;

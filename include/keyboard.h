@@ -8,4 +8,6 @@ extern io_buffer kb_buffer;
 
 void kbuffer_init();
 
+void keyboard_init();
+
 void keyboard_handler(u8 code);
