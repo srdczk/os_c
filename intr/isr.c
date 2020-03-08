@@ -136,8 +136,6 @@ void int_dispatch(int_frame *tf) {
         } else if (tf->int_no == IRQ_BEGIN + 1) {
             keyboard_handler(inb(KEY_PORT));
         } else if (tf->int_no == IRQ_IDE1) {
-            kprintf("HD!-> INTR\n");
-            // 硬盘结构
         }
     } else syscall(tf);
 }

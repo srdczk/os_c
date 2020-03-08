@@ -3,6 +3,7 @@
 #include "types.h"
 #include "list.h"
 #include "bitmap.h"
+#include "super_block.h"
 
 
 typedef struct {
@@ -21,7 +22,7 @@ typedef struct {
     list_node part_tag;
     char name[8];
     // 分区的超级块
-    struct super_block *sb;
+    super_block *sb;
     // 块位图
     bitmap block_bitmap;
     // inode 位图
@@ -42,6 +43,7 @@ typedef struct {
     partition logic_parts[8];
 } ide_device;
 
+extern ide_device ide_devices[];
 
 void ide_init();
 

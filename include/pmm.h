@@ -30,8 +30,6 @@
 #define KERNEL_SPACE_SIZE 0x40000000
 
 #define PTE_OFFSET 0xffc00000
-// 向上取整
-#define DIV_ROUND_UP(X, Y) ((X + Y - 1) / (Y))
 
 extern u8 kernel_start[];
 extern u8 kernel_end[];

@@ -9,6 +9,8 @@
 #define EFLAGS_IOPL_3 (3 << 12)
 #define EFLAGS_IOPL_0 (0)
 
+// 向上取整
+#define DIV_ROUND_UP(X, Y) ((X + Y - 1) / (Y))
 
 typedef unsigned int u32;
 typedef int s32;

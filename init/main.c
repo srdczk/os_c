@@ -10,6 +10,7 @@
 #include "../include/syscall.h"
 #include "../include/isr.h"
 #include "../include/gdt.h"
+#include "../include/fs.h"
 #include "../include/process.h"
 #include "../include/thread.h"
 // 设置临时页表
@@ -111,9 +112,8 @@ void kernel_init() {
     pmm_init();
     kernel_thread_init();
     ide_init();
+    filesys_init();
     enable_int();
-    mil_sleep(2000);
-    thread_start("tb", 30, thread_b, NULL);
     while (1);
 }
 
