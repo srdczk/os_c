@@ -5,6 +5,8 @@
 #include "list.h"
 #include "pmm.h"
 
+#define MAX_OPEN_FILE 0x08
+
 typedef void thread_func(void *);
 
 typedef enum {
@@ -48,6 +50,8 @@ typedef struct {
     pool user_pool;
     // 用户进程arena 描述 -> 用于 malloc
     arena_desc user_arena[DESC_NUM];
+    // 文件描述符
+    s32 fd_table[MAX_OPEN_FILE];
     // 魔数, 检测栈是否溢出
     u32 stack_magic;
 } task_struct;

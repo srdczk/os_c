@@ -64,10 +64,18 @@ void thread_init(task_struct *pthread, char *name, u32 priority) {
     // 和正在运行的内核栈 统一 -> 分配 1 页 大小的栈空间
     pthread->self_stack = (u32)pthread + TSTACK_SIZE;
     pthread->priority = priority;
-    pthread->pid = global_pid++;
+    pthread->pid = (u32) global_pid++;
     pthread->ticks = priority;
     pthread->running_ticks = 0;
     pthread->pgdir = 0;
+    // 设置文件描述符, 预留 012 stdin stdout stderr
+    pthread->fd_table[0] = 0;
+    pthread->fd_table[1] = 1;
+    pthread->fd_table[2] = 2;
+    int i;
+    for (i = 3; i < MAX_OPEN_FILE; ++i) {
+        pthread->fd_table[i] = -1;
+    }
     pthread->stack_magic = 0xabbacddc;
 }
 

@@ -5,7 +5,6 @@
 #include "bitmap.h"
 #include "super_block.h"
 
-
 typedef struct {
     u16 base, ctrl;
 } channel;
@@ -42,6 +41,8 @@ typedef struct {
     // 逻辑分区
     partition logic_parts[8];
 } ide_device;
+
+extern list part_list;
 
 extern ide_device ide_devices[];
 

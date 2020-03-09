@@ -5,9 +5,7 @@
 
 #include "types.h"
 #include "inode.h"
-#include "fs.h"
 //目录项描述
-
 // 最长文件名
 #define MAX_FILE_NAME_LEN 16
 // 目录结构
@@ -27,4 +25,21 @@ typedef struct {
     //文件类型
     file_type type;
 } dir_entry;
+
+
+extern dir root_dir;
+
+void open_root_dir(partition *part);
+
+dir *dir_open(partition* part, u32 inode_no);
+
+bool search_dir_entry(partition *part, dir *pdir, const char *name, dir_entry *entry);
+
+void dir_close(dir *d);
+
+void create_dir_entry(char *filename, u32 inode_no, file_type type, dir_entry *entry);
+
+bool sync_dir_entry(dir *parent_dir, dir_entry *entry, void *buf);
+
+
 

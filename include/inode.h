@@ -21,3 +21,13 @@ typedef struct {
     list_node inode_tag;
 } inode;
 
+void inode_sync(partition *part, inode *node, void *buf);
+
+inode *inode_open(partition *part, u32 inode_no);
+
+void inode_close(inode *node);
+
+void inode_init(u32 inode_no, inode *new_inode);
+
+
+

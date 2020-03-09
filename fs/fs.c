@@ -2,12 +2,53 @@
 // Created by srdczk on 20-3-8.
 //
 #include "../include/fs.h"
-#include "../include/ide.h"
-#include "../include/dir.h"
+#include "../include/file.h"
 #include "../include/stdio.h"
+#include "../include/thread.h"
 #include "../include/string.h"
 #include "../include/pmm.h"
+#include "../include/debug.h"
 #include "../include/console.h"
+
+// 默认操作分区
+partition *cur_part;
+
+// 挂载分区, 选择操作分区
+static bool mount_partition(list_node *node, void *arg) {
+    char *name = (char *)arg;
+    partition *part = node2entry(partition, part_tag, node);
+    if (!strcmp(part->name, name)) {
+        cur_part = part;
+        u16 devno = part->devno;
+        // 读入超级块
+        super_block *sb = (super_block *)pmm_malloc(SECTOR_SIZE);
+        // 内存中加载分区信息
+        cur_part->sb = (super_block *)pmm_malloc(sizeof(super_block));
+        if (!cur_part->sb) PANIC("alloc fail!");
+
+        memset(sb, '\0', SECTOR_SIZE);
+        ide_read_secs(devno, cur_part->start_lba + 1, sb, 1);
+
+        memcpy(sb, cur_part->sb, sizeof(super_block));
+        cur_part->block_bitmap.map = (char *)pmm_malloc(sb->block_bitmap_secs * SECTOR_SIZE);
+        if (!cur_part->block_bitmap.map) PANIC("alloc fail! -> bitmap");
+        cur_part->block_bitmap.map_len = sb->block_bitmap_secs * SECTOR_SIZE;
+        ide_read_secs(devno, sb->block_bitmap_lba, cur_part->block_bitmap.map, sb->block_bitmap_secs);
+
+        cur_part->inode_bitmap.map = (char *)pmm_malloc(sb->inode_bitmap_secs * SECTOR_SIZE);
+        if (!cur_part->inode_bitmap.map) PANIC("malloc fail -> inode bm");
+        cur_part->inode_bitmap.map_len = sb->inode_bitmap_secs * SECTOR_SIZE;
+
+        ide_read_secs(devno, sb->inode_bitmap_lba, cur_part->inode_bitmap.map, sb->inode_bitmap_secs);
+
+        list_init(&cur_part->open_inodes);
+
+        kprintf("%s mount done!\n", part->name);
+        return 1;
+    }
+    // 继续
+    return 0;
+}
 
 // 初始化 分区信息
 static void partition_format(partition *part) {
@@ -119,6 +160,89 @@ static void partition_format(partition *part) {
     pmm_free(buf);
 }
 
+// 解析路径
+static char *path_parse(char *pathname, char *name_store) {
+    if (pathname[0] == '/') {
+        // 跳过 ‘/’
+        while (*(++pathname) == '/');
+    }
+
+    // 最上层 路径
+    while (*pathname != '/' && *pathname) {
+        *name_store++ = *pathname++;
+    }
+
+    if (!pathname[0]) return NULL;
+
+    return pathname;
+}
+
+
+// 返回路径 层数 /x/y/z
+int path_depth(char *pathname) {
+    char *p = pathname;
+    char name[MAX_FILE_NAME_LEN];
+    u32 depth = 0;
+    p = path_parse(p, name);
+    while (name[0]) {
+        depth++;
+        memset(name, '\0', MAX_FILE_NAME_LEN);
+        if (p) {
+            p = path_parse(p, name);
+        }
+    }
+    return depth;
+}
+
+// 搜索文件
+static int search_file(const char* pathname, path_search_record *record) {
+    // 如果查找的是根目录
+    if (!strcmp(pathname, "/") || !strcmp(pathname, "/.") || !strcmp(pathname, "/..")) {
+        record->parent_dir = &root_dir;
+        record->type = DIRECTORY;
+        record->searched_path[0] = 0;
+        return 0;
+    }
+    u32 path_len = strlen(pathname);
+    char *sub_path = (char *)pathname;
+    dir *parent_dir = &root_dir;
+    dir_entry entry;
+    char name[MAX_FILE_NAME_LEN] = {0};
+    record->parent_dir = parent_dir;
+    record->type = UNKNOWN;
+
+    u32 parent_inode_no = 0;
+    sub_path = path_parse(sub_path, name);
+    while (name[0]) {
+        strcat("/", record->searched_path);
+        strcat(name, record->searched_path);
+        if (search_dir_entry(cur_part, parent_dir, name, &entry)) {
+            memset(name, '\0', MAX_FILE_NAME_LEN);
+            if (sub_path) sub_path = path_parse(sub_path, name);
+            if (entry.type == DIRECTORY) {
+                parent_inode_no = parent_dir->node->i_no;
+                dir_close(parent_dir);
+                parent_dir = dir_open(cur_part, entry.i_no);
+                record->parent_dir = parent_dir;
+                continue;
+            } else if (entry.type == REGULAR) {
+                record->type = REGULAR;
+                return entry.i_no;
+            }
+            // 未找到
+        } else return -1;
+    }
+
+    // 遍历完整路径
+    dir_close(record->parent_dir);
+
+    record->parent_dir = dir_open(cur_part, parent_inode_no);
+    record->type = DIRECTORY;
+
+    return entry.i_no;
+}
+
+
 // 初始化文件系统
 void filesys_init() {
     // 暂时 只 处理 0 号磁盘
@@ -147,6 +271,99 @@ void filesys_init() {
         cnt++;
     }
     pmm_free(sb);
+    // 默认分区, -> 主分区
+    char default_part[8] = "sda1";
+    list_traversal(&part_list, mount_partition, (void *)default_part);
+
+    // 创建根目录
+    open_root_dir(cur_part);
+
+    table_init();
+}
+
+/* 打开或创建文件成功后,返回文件描述符,否则返回-1 */
+int fs_open(const char *pathname, u8 flag) {
+    if (pathname[strlen(pathname) - 1] == '/') {
+        kprintf("can't open dir: %s\n", pathname);
+        return -1;
+    }
+    int fd = -1;
+    path_search_record record;
+    memset(&record, '\0', sizeof(path_search_record));
+    u32 depth = path_depth((char *)pathname);
+    int inode_no = search_file(pathname, &record);
+    bool found = inode_no == -1 ? 0 : 1;
+    if (record.type == DIRECTORY) {
+        kprintf("can't open dir: %s\n", pathname);
+        dir_close(record.parent_dir);
+        return -1;
+    }
+    u32 search_depth = path_depth(record.searched_path);
+    if (search_depth != depth) {
+        kprintf("can't access:%s\n", pathname);
+        dir_close(record.parent_dir);
+        return -1;
+    }
+
+    if (!found && !(flag & O_CREAT)) {
+        //未找到并且不是 创建
+        kprintf("in path %s not found: %s\n", record.searched_path, (strrchr(record.searched_path, '/') + 1));
+        dir_close(record.parent_dir);
+        return -1;
+    } else if (found && (flag & O_CREAT)) {
+        kprintf("%s already exist\n", pathname);
+        dir_close(record.parent_dir);
+        flag &= ~O_CREAT;
+    }
+    switch (flag & O_CREAT) {
+        case O_CREAT:
+            kprintf("creating file...\n");
+            fd = file_create(record.parent_dir, (strrchr(pathname, '/') + 1), flag);
+            dir_close(record.parent_dir);
+            break;
+            // 否则直接打开文件
+        default:
+            fd = file_open(inode_no, flag);
+            break;
+    }
+    return fd;
+}
+
+// 转换成全局的描述符
+static u32 fd_local2global(u32 local_fd) {
+    task_struct *cur = running_thread();
+    return (u32)cur->fd_table[local_fd];
+}
+
+int fs_close(u32 fd) {
+    int res = -1;
+    if (fd > 2) {
+        res = file_close(&file_table[fd_local2global(fd)]);
+        running_thread()->fd_table[fd] = -1;
+    }
+    return res;
+}
+
+int fs_write(u32 fd, const void *buf, u32 cnt) {
+    if (fd == stdout_no) {
+        char tmp_buf[1024];
+        memcpy(buf, tmp_buf, cnt);
+        tmp_buf[cnt] = '\0';
+        console_print(tmp_buf);
+        return cnt;
+    }
+    file *wf = &file_table[fd_local2global(fd)];
+    if ((wf->fd_flag & O_WRONLY) || (wf->fd_flag & O_RDWR)) {
+        u32 res = file_write(wf, buf, cnt);
+        return res;
+    } else {
+        console_print("File flag not WRONLY or RDWR \n");
+        return -1;
+    }
+}
+
+int fs_read(u32 fd, void *buf, u32 cnt) {
+    return file_read(&file_table[fd_local2global(fd)], buf, cnt);
 }
 
 
