@@ -366,4 +366,69 @@ int fs_read(u32 fd, void *buf, u32 cnt) {
     return file_read(&file_table[fd_local2global(fd)], buf, cnt);
 }
 
+int fs_lseek(u32 fd, int offset, u8 seek) {
+    u32 gfd = fd_local2global(fd);
+    file *f = &file_table[gfd];
+    int new_pos = 0;
+    int file_size = (int)f->fd_inode->i_size;
+    switch (seek) {
+        // 设置
+        case SEEK_SET:
+            new_pos = offset;
+            break;
+        case SEEK_CUR:
+            new_pos = (int)f->fd_pos + offset;
+            break;
+        case SEEK_END:
+            new_pos = file_size + offset;
+            break;
+    }
+    if (new_pos < 0 || new_pos > (file_size - 1)) return -1;
+    f->fd_pos = new_pos;
+    return new_pos;
+}
+
+int fs_unlink(const char *pathname) {
+    path_search_record record;
+    memset(&record, '\0', sizeof(path_search_record));
+    int inode_no = search_file(pathname, &record);
+    if (inode_no == -1) {
+        kprintf("file %s not found\n", pathname);
+        dir_close(record.parent_dir);
+        return -1;
+    }
+    if (record.type == DIRECTORY) {
+        kprintf("can't delete a directory\n");
+        dir_close(record.parent_dir);
+        return -1;
+    }
+    u32 file_index = 0;
+    while (file_index < MAX_FILE) {
+        if (file_table[file_index].fd_inode && (u32)inode_no == file_table[file_index].fd_inode->i_no) {
+            break;
+        }
+        file_index++;
+    }
+    if (file_index < MAX_FILE) {
+        dir_close(record.parent_dir);
+        kprintf("file is in user\n");
+        return -1;
+    }
+
+    void *io_buf = pmm_malloc(SECTOR_SIZE + SECTOR_SIZE);
+
+    if (!io_buf) {
+        dir_close(record.parent_dir);
+        kprintf("can't alloc io_buf: fs_unlink\n");
+        return -1;
+    }
+
+    dir *parent_dir = record.parent_dir;
+    delete_dir_entry(cur_part, parent_dir, inode_no, io_buf);
+    inode_release(cur_part, inode_no);
+    pmm_free(io_buf);
+    dir_close(record.parent_dir);
+    // 删除成功
+    return 0;
+}
 

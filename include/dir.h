@@ -41,5 +41,7 @@ void create_dir_entry(char *filename, u32 inode_no, file_type type, dir_entry *e
 
 bool sync_dir_entry(dir *parent_dir, dir_entry *entry, void *buf);
 
+bool delete_dir_entry(partition *part, dir *pdir, u32 inode_no, void *io_buf);
+
 
 

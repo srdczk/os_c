@@ -115,28 +115,12 @@ void kernel_init() {
     ide_init();
     filesys_init();
     enable_int();
-    int fd = fs_open("/file2", O_RDWR);
-    kprintf("fd:%d\n", fd);
-    char buf[64] = {0};
-    int len = fs_read((u32) fd, buf, 16);
-    kprintf("\n 1 read:%d, %s\n", len, buf);
-    int i;
-    for (i = 0; i < 16; ++i) {
-        console_putc(buf[i], GREEN);
-    }
-    memset(buf, '\0', 64);
-    len = fs_read((u32) fd, buf, 8);
-    kprintf("\n 2 read:%d, %s\n", len, buf);
-    memset(buf, '\0', 64);
-    len = fs_read((u32) fd, buf, 6);
-    kprintf("\n 3 read:%d, %s\n", len, buf);
-    fs_close((u32) fd);
-    kprintf("<===close: reopen===>");
-    fd = fs_open("/file2", O_RDWR);
-    memset(buf, '\0', 64);
-    len = fs_read((u32) fd, buf, 24);
-    kprintf("\n 4 read:%d, %s\n", len, buf);
-    fs_close((u32) fd);
+    int fd = fs_open("/file1", O_CREAT);
+    fs_close(fd);
+    int res = fs_unlink("/file1");
+    kprintf("\ndel res:%d\n", res);
+    fd = fs_open("/file1", O_RDWR);
+    kprintf("\nopen res:%d\n", fd);
     thread_start("TA", 15, thread_b, NULL);
     process_exec(u_proc_a, "PA");
     while (1);

@@ -43,6 +43,11 @@ typedef enum {
     O_CREAT = 4 // 0x0 0x1 0x2 0x4
 } file_flag;
 
+typedef enum {
+    SEEK_SET = 1,
+    SEEK_CUR,
+    SEEK_END
+} file_seek;
 
 typedef struct {
     u16 limit;

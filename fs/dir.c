@@ -178,5 +178,93 @@ bool sync_dir_entry(dir *parent_dir, dir_entry *entry, void *buf) {
     return 0;
 }
 
+// 删除目录
+bool delete_dir_entry(partition *part, dir *pdir, u32 inode_no, void *io_buf) {
+    inode *dir_inode = pdir->node;
+    u32 block_index = 0;
+    u32 all_blocks[140] = {0};
+    while (block_index < 12) {
+        all_blocks[block_index] = dir_inode->i_sectors[block_index];
+        block_index++;
+    }
+    if (dir_inode->i_sectors[12]) {
+        ide_read_secs(part->devno, dir_inode->i_sectors[12], all_blocks + 12, 1);
+    }
+
+    // 目录项存储时, 不会跨越扇区
+    u32 dir_entry_size = part->sb->dir_entry_size;
+    u32 dir_entrys_per_sec = (SECTOR_SIZE / dir_entry_size);
+    dir_entry *dir_e = (dir_entry *)io_buf;
+    dir_entry *dir_entry_found = NULL;
+    u8 dir_entry_index;
+    u8 dir_entry_cnt;
+    bool is_dir_first_block = 0;
+
+    block_index = 0;
+    while (block_index < 140) {
+        is_dir_first_block = 0;
+        if (!all_blocks[block_index]) {
+            block_index++;
+            continue;
+        }
+        dir_entry_index = dir_entry_cnt = 0;
+        memset(io_buf, '\0', SECTOR_SIZE);
+        // 获得目录项
+        ide_read_secs(part->devno, all_blocks[block_index], io_buf, 1);
+        // 遍历目录项
+        while (dir_entry_index < dir_entrys_per_sec) {
+            if ((dir_e + dir_entry_index)->type != UNKNOWN) {
+                if (!strcmp((dir_e + dir_entry_index)->filename, ".")) {
+                    is_dir_first_block = 1;
+                } else if (strcmp((dir_e + dir_entry_index)->filename, ".") &&strcmp((dir_e + dir_entry_index)->filename, "..")) {
+                    dir_entry_cnt++;
+                    if ((dir_e + dir_entry_index)->i_no == inode_no) {
+                        dir_entry_found = dir_e + dir_entry_index;
+                    }
+                }
+            }
+            dir_entry_index++;
+        }
+        if (!dir_entry_found) {
+            block_index++;
+            continue;
+        }
+        if (dir_entry_cnt == 1 && !is_dir_first_block) {
+            u32 block_bitmap_index = all_blocks[block_index] - part->sb->data_start_lba;
+            bitmap_set(&part->block_bitmap, block_bitmap_index, 0);
+            bitmap_sync(part, block_bitmap_index, BLOCK_BITMAP);
+
+            if (block_index < 12) {
+                dir_inode->i_sectors[block_index] = 0;
+            } else {
+                u32 indirect_blocks = 0;
+                u32 indirect_block_index = 12;
+                while (indirect_block_index < 140) {
+                    if (all_blocks[indirect_block_index]) indirect_block_index++;
+                }
+
+                if (indirect_blocks > 1) {
+                    all_blocks[block_index] = 0;
+                    ide_write_secs(part->devno, dir_inode->i_sectors[12], all_blocks + 12, 1);
+                } else {
+                    block_bitmap_index = dir_inode->i_sectors[12] - part->sb->data_start_lba;
+                    bitmap_set(&part->block_bitmap, block_bitmap_index, 0);
+                    bitmap_sync(part, block_bitmap_index, BLOCK_BITMAP);
+                    dir_inode->i_sectors[12] = 0;
+                }
+            }
+        } else {
+            memset(dir_entry_found, '\0', dir_entry_size);
+            ide_write_secs(part->devno, all_blocks[block_index], io_buf, 1);
+        }
+        dir_inode->i_size -= dir_entry_size;
+        memset(io_buf, '\0', 2 * SECTOR_SIZE);
+        inode_sync(part, dir_inode, io_buf);
+
+        return 1;
+    }
+    return 0;
+}
+
 
 

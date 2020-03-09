@@ -31,3 +31,7 @@ int fs_close(u32 fd);
 int fs_write(u32 fd, const void *buf, u32 cnt);
 
 int fs_read(u32 fd, void *buf, u32 cnt);
+
+int fs_lseek(u32 fd, int offset, u8 seek);
+
+int fs_unlink(const char *pathname);

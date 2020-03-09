@@ -29,5 +29,5 @@ void inode_close(inode *node);
 
 void inode_init(u32 inode_no, inode *new_inode);
 
-
+void inode_release(partition *part, u32 inode_no);
 

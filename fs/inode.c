@@ -2,6 +2,7 @@
 // Created by srdczk on 20-3-9.
 //
 #include "../include/inode.h"
+#include "../include/file.h"
 #include "../include/thread.h"
 #include "../include/string.h"
 #include "../include/isr.h"
@@ -135,4 +136,39 @@ void inode_init(u32 inode_no, inode *new_inode) {
     memset((char *)new_inode->i_sectors, '\0', 13 * sizeof(u32));
 }
 
+// 回收 inode
+void inode_release(partition  *part, u32 inode_no) {
+    inode *inode_to_del = inode_open(part, inode_no);
 
+    u8 block_index = 0;
+    u8 block_cnt = 12;
+    u32 block_bitmap_index;
+    u32 all_blocks[140] = {0};
+
+    while (block_index < 12) {
+        all_blocks[block_index] = inode_to_del->i_sectors[block_index];
+        block_index++;
+    }
+
+    if (inode_to_del->i_sectors[12]) {
+        ide_read_secs(part->devno, inode_to_del->i_sectors[12], all_blocks + 12, 1);
+        block_cnt = 140;
+
+        block_bitmap_index = inode_to_del->i_sectors[12] - part->sb->data_start_lba;
+        bitmap_set(&part->block_bitmap, block_bitmap_index, 0);
+        bitmap_sync(part, block_bitmap_index, BLOCK_BITMAP);
+    }
+
+    block_index = 0;
+    while (block_index < block_cnt) {
+        if (all_blocks[block_index]) {
+            block_bitmap_index = all_blocks[block_index] - part->sb->data_start_lba;
+            bitmap_set(&part->block_bitmap, block_bitmap_index, 0);
+            bitmap_sync(part, block_index, BLOCK_BITMAP);
+        }
+        block_index++;
+    }
+    bitmap_set(&part->inode_bitmap, inode_no, 0);
+    bitmap_sync(part, inode_no, INODE_BITMAP);
+    inode_close(inode_to_del);
+}
