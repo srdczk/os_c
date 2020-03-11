@@ -52,6 +52,8 @@ typedef struct {
     arena_desc user_arena[DESC_NUM];
     // 文件描述符
     s32 fd_table[MAX_OPEN_FILE];
+    // 工作目录的inode
+    u32 cwd_inode_nr;
     // 魔数, 检测栈是否溢出
     u32 stack_magic;
 } task_struct;

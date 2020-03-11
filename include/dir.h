@@ -43,5 +43,11 @@ bool sync_dir_entry(dir *parent_dir, dir_entry *entry, void *buf);
 
 bool delete_dir_entry(partition *part, dir *pdir, u32 inode_no, void *io_buf);
 
+dir_entry *dir_read(dir *d);
+
+bool dir_is_empty(dir *d);
+
+int dir_remove(dir *parent_dir, dir *child_dir);
+
 
 

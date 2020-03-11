@@ -432,3 +432,303 @@ int fs_unlink(const char *pathname) {
     return 0;
 }
 
+// 创建目录
+int fs_mkdir(const char *pathname) {
+    u8 rollback_step = 0;
+    void *io_buf = pmm_malloc(2 * SECTOR_SIZE);
+    if (!io_buf) {
+        kprintf("fs_mkdir: pmm_malloc for io_buf fail\n");
+        return -1;
+    }
+
+    path_search_record record;
+    memset(&record, '\0', sizeof(path_search_record));
+    int inode_no = -1;
+    if ((inode_no = search_file(pathname, &record)) != -1) {
+        kprintf("pmm_mkdir: file or directory %s exist!\n", pathname);
+        rollback_step = 1;
+        goto rollback;
+    } else {
+        u32 depth = path_depth((char *)pathname);
+        u32 search_depth = path_depth(record.searched_path);
+        if (depth != search_depth) {
+            kprintf("pmm_mkdir: fail for path\n");
+            rollback_step = 1;
+            goto rollback;
+        }
+    }
+
+    dir *parent_dir = record.parent_dir;
+
+    char *dirname = strrchr(record.searched_path, '/') + 1;
+
+    inode_no = inode_bitmap_alloc(cur_part);
+
+    if ((inode_no = inode_bitmap_alloc(cur_part)) == -1) {
+        kprintf("alloc inode fail\n");
+        rollback_step = 1;
+        goto rollback;
+    }
+
+    inode new_dir_inode;
+    inode_init(inode_no, &new_dir_inode);
+
+    u32 block_bitmap_index = 0;
+    int block_lba = -1;
+    block_lba = block_bitmap_alloc(cur_part);
+    if (block_lba == -1) {
+        kprintf("block bitmap alloc for create directory\n");
+        rollback_step = 2;
+        goto rollback;
+    }
+    new_dir_inode.i_sectors[0] = block_lba;
+    // 同步到硬盘上
+    block_bitmap_index = block_lba - cur_part->sb->data_start_lba;
+    bitmap_sync(cur_part, block_bitmap_index, BLOCK_BITMAP);
+    memset(io_buf, '\0', 2 * SECTOR_SIZE);
+
+    dir_entry *entry = (dir_entry *)io_buf;
+
+    memcpy(".", entry->filename, 1);
+    entry->i_no = inode_no;
+    entry->type = DIRECTORY;
+
+    entry++;
+    memcpy("..", entry->filename, 2);
+    entry->i_no = parent_dir->node->i_no;
+    entry->type = DIRECTORY;
+
+    ide_write_secs(cur_part->devno, new_dir_inode.i_sectors[0], io_buf, 1);
+    new_dir_inode.i_size = 2 * cur_part->sb->dir_entry_size;
+
+    dir_entry new_dir_entry;
+    memset(&new_dir_entry, '\0', sizeof(dir_entry));
+    create_dir_entry(dirname, inode_no, DIRECTORY, &new_dir_entry);
+    memset(io_buf, '\0', 2 * SECTOR_SIZE);
+    if (!sync_dir_entry(parent_dir, &new_dir_entry, io_buf)) {
+        kprintf("pmm: sync_direntry fail\n");
+        rollback_step = 2;
+        goto rollback;
+    }
+
+    memset(io_buf, '\0', 2 * SECTOR_SIZE);
+
+    inode_sync(cur_part, parent_dir->node, io_buf);
+    memset(io_buf, '\0', 2 * SECTOR_SIZE);
+    inode_sync(cur_part, &new_dir_inode, io_buf);
+
+    bitmap_sync(cur_part, inode_no, INODE_BITMAP);
+
+    pmm_free(io_buf);
+
+    dir_close(record.parent_dir);
+
+    return 0;
+    // 错误回滚
+    rollback:
+    switch (rollback_step) {
+        case 2:
+            bitmap_set(&cur_part->inode_bitmap, inode_no, 0);
+        case 1:
+            dir_close(record.parent_dir);
+            break;
+    }
+    pmm_free(io_buf);
+    return -1;
+}
+
+// 打开目录
+dir *fs_opendir(const char *name) {
+    if (name[0] == '/' && (!name[1] || name[0] == '.')) {
+        return &root_dir;
+    }
+    path_search_record record;
+    memset(&record, 0, sizeof(path_search_record));
+    int inode_no = search_file(name, &record);
+    dir *res = NULL;
+    if (inode_no == -1) {
+        kprintf("In %s, sub path %s not exist\n", name, record.searched_path);
+    } else {
+        if (record.type == REGULAR) {
+            kprintf("%s is regular file!\n", name);
+        } else if (record.type == DIRECTORY) {
+            res = dir_open(cur_part, inode_no);
+        }
+    }
+    dir_close(record.parent_dir);
+    return res;
+}
+
+//关闭目录
+int fs_closedir(dir *d) {
+    int res = -1;
+    if (d) {
+        dir_close(d);
+        res = 0;
+    }
+    return res;
+}
+
+dir_entry *fs_readdir(dir *d) {
+    return dir_read(d);
+}
+
+void fs_rewinddir(dir *d) {
+    d->dir_pos = 0;
+}
+
+int fs_rmdir(const char *pathname) {
+    path_search_record record;
+    memset(&record, '\0', sizeof(path_search_record));
+    int inode_no = search_file(pathname, &record);
+    int res = -1;
+    if (inode_no == -1) kprintf("%s not exist\n", pathname);
+    else {
+        if (record.type == REGULAR) {
+            kprintf("%s is regular file!\n", pathname);
+        } else {
+            dir *d = dir_open(cur_part, inode_no);
+            if (!dir_is_empty(d)) {
+                // 不能删除非空目录
+                kprintf("dir %s is not empty!\n", pathname);
+            } else {
+                if (!dir_remove(record.parent_dir, d)) {
+                    res = 0;
+                }
+            }
+            dir_close(d);
+        }
+    }
+    dir_close(record.parent_dir);
+    return res;
+}
+
+static u32 get_parent_dir_inode_nr(u32 child_inode_nr, void *io_buf) {
+    inode *child_dir_inode = inode_open(cur_part, child_inode_nr);
+    u32 block_lba = child_dir_inode->i_sectors[0];
+    inode_close(child_dir_inode);
+    ide_read_secs(cur_part->devno, block_lba, io_buf, 1);
+    dir_entry *entry = (dir_entry *)io_buf;
+    // 0 -> . , 1 -> ..
+    return entry[1].i_no;
+}
+
+static int get_child_dir_name(u32 p_inode_nr, u32 c_inode_nr, char *path, void *io_buf) {
+    inode *parent_dir_inode = inode_open(cur_part, p_inode_nr);
+    u8 block_index = 0;
+    u32 all_blocks[140] = {0};
+    u32 block_cnt = 12;
+    while (block_index < 12) {
+        all_blocks[block_index] = parent_dir_inode->i_sectors[block_index];
+        block_index++;
+    }
+    if (parent_dir_inode->i_sectors[12]) {
+        ide_read_secs(cur_part->devno, parent_dir_inode->i_sectors[12], all_blocks + 12, 1);
+        block_cnt = 140;
+    }
+    inode_close(parent_dir_inode);
+    dir_entry *entry = (dir_entry *)io_buf;
+    u32 dir_entry_size = cur_part->sb->dir_entry_size;
+    u32 dir_entrys_per_sec = (512 / dir_entry_size);
+    block_index = 0;
+    while (block_index < block_cnt) {
+        if (all_blocks[block_index]) {
+            ide_read_secs(cur_part->devno, all_blocks[block_index], io_buf, 1);
+            u8 dir_entry_index = 0;
+            while (dir_entry_index < dir_entrys_per_sec) {
+                if ((entry + dir_entry_index)->i_no == c_inode_nr) {
+                    strcat("/", path);
+                    strcat((entry + dir_entry_index)->filename, path);
+                    return 0;
+                }
+                dir_entry_index++;
+            }
+        }
+        block_index++;
+    }
+    return -1;
+}
+
+char *fs_getcwd(char *buf, u32 size) {
+    void *io_buf = pmm_malloc(SECTOR_SIZE);
+    if (!io_buf) return NULL;
+
+    task_struct *cur = running_thread();
+    int parent_inode_nr = 0;
+    int child_inode_nr = cur->cwd_inode_nr;
+    // 如果是根目录
+    if (!child_inode_nr) {
+        buf[0] = '/';
+        buf[1] = '\0';
+        return buf;
+    }
+
+    memset(buf, '\0', size);
+
+    char full_path[MAX_PATH_LEN] = {0};
+
+    while (child_inode_nr) {
+        // 知道找到根目录
+        parent_inode_nr = get_parent_dir_inode_nr(child_inode_nr, io_buf);
+        if (get_child_dir_name(parent_inode_nr, child_inode_nr, full_path, io_buf) == -1) {
+            pmm_free(io_buf);
+            return NULL;
+        }
+        child_inode_nr = parent_inode_nr;
+    }
+    char *last_slash;
+    while ((last_slash = strrchr(full_path, '/'))) {
+        u16 len = strlen(buf);
+        strcpy(last_slash, buf + len);
+        *last_slash = '\0';
+    }
+    pmm_free(io_buf);
+    return buf;
+}
+
+// 更换工作目录
+int fs_chdir(const char *path) {
+    int res = -1;
+    path_search_record record;
+    memset(&record, '\0', sizeof(path_search_record));
+    int inode_no = search_file(path, &record);
+    if (inode_no != -1) {
+        if (record.type == DIRECTORY) {
+            running_thread()->cwd_inode_nr = inode_no;
+            res = 0;
+        } else {
+            kprintf("can't change to a regular file!\n");
+        }
+    }
+    dir_close(record.parent_dir);
+    return res;
+}
+// 文件属性
+int fs_stat(const char *path, stat *buf) {
+    // 如果是根目录
+    if (!strcmp(path, "/") || !strcmp(path, "/.") || !strcmp(path, "/..")) {
+        buf->st_ino = 0;
+        buf->st_type = DIRECTORY;
+        buf->st_size = root_dir.node->i_size;
+        return 0;
+    }
+    int res = -1;
+    path_search_record record;
+    memset(&record, '\0', sizeof(path_search_record));
+
+    int inode_no = search_file(path, &record);
+    if (inode_no != -1) {
+        inode *obj_inode = inode_open(cur_part, inode_no);
+        buf->st_size = obj_inode->i_size;
+        inode_close(obj_inode);
+        buf->st_type = record.type;
+        buf->st_ino = inode_no;
+        res = 0;
+    } else {
+        kprintf("fs_stat: %s not found\n", path);
+    }
+    dir_close(record.parent_dir);
+    return res;
+}
+
+

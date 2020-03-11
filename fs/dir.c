@@ -266,5 +266,76 @@ bool delete_dir_entry(partition *part, dir *pdir, u32 inode_no, void *io_buf) {
     return 0;
 }
 
+// 读取 目录, 获得目录项
+dir_entry *dir_read(dir *d) {
+    dir_entry *dir_e = (dir_entry *)d->dir_buf;
+    inode *dir_inode = d->node;
+    u32 all_blocks[140] = {0};
+    u32 block_cnt = 12;
+    u32 block_index = 0;
+    u32 dir_entry_index = 0;
+    while (block_index < 12) {
+        all_blocks[block_index] = dir_inode->i_sectors[block_index];
+        block_index++;
+    }
+    if (dir_inode->i_sectors[12]) {
+        ide_read_secs(cur_part->devno, dir_inode->i_sectors[12], all_blocks + 12, 1);
+        block_cnt = 140;
+    }
+    block_index = 0;
+    u32 cur_dir_entry_pos = 0;
+    u32 dir_entry_size = cur_part->sb->dir_entry_size;
+    u32 dir_entrys_per_sec = SECTOR_SIZE / dir_entry_size;
+
+    while (block_index < block_cnt) {
+        if (d->dir_pos >= dir_inode->i_size) {
+            return NULL;
+        }
+        if (!all_blocks[block_index]) {
+            block_index++;
+            continue;
+        }
+        memset(dir_e, '\0', SECTOR_SIZE);
+        ide_read_secs(cur_part->devno, all_blocks[block_index], dir_e, 1);
+        dir_entry_index = 0;
+        while (dir_entry_index < dir_entrys_per_sec) {
+            if ((dir_e + dir_entry_index)->type) {
+                if (cur_dir_entry_pos < d->dir_pos) {
+                    cur_dir_entry_pos += dir_entry_size;
+                    dir_entry_index++;
+                    continue;
+                }
+                d->dir_pos += dir_entry_size;
+                return dir_e + dir_entry_index;
+            }
+            dir_entry_index++;
+        }
+        block_index++;
+    }
+    return NULL;
+}
+
+// 判断目录是否为空
+bool dir_is_empty(dir *d) {
+    // 如果只有 . 和 ..
+    return d->node->i_size == cur_part->sb->dir_entry_size * 2;
+}
+
+// 删除 child
+int dir_remove(dir *parent_dir, dir *child_dir) {
+    inode *child_inode = child_dir->node;
+    int block_index = 1;
+    void *io_buf = NULL;
+    if (!(io_buf = pmm_malloc(2 * SECTOR_SIZE))) {
+        kprintf("iobuf alloc fail: dir.c:330\n");
+        return -1;
+    }
+    // 父目录中删除
+    delete_dir_entry(cur_part, parent_dir, child_inode->i_no, io_buf);
+    // 回收inode
+    inode_release(cur_part, child_inode->i_no);
+    pmm_free(io_buf);
+    return 0;
+}
 
 

@@ -35,3 +35,21 @@ int fs_read(u32 fd, void *buf, u32 cnt);
 int fs_lseek(u32 fd, int offset, u8 seek);
 
 int fs_unlink(const char *pathname);
+
+int fs_mkdir(const char *pathname);
+
+dir *fs_opendir(const char *name);
+
+int fs_closedir(dir *d);
+
+dir_entry *fs_readdir(dir *d);
+
+void fs_rewinddir(dir *d);
+
+int fs_rmdir(const char *pathname);
+
+char *fs_getcwd(char *buf, u32 size);
+
+int fs_chdir(const char *path);
+// 文件属性
+int fs_stat(const char *path, stat *buf);

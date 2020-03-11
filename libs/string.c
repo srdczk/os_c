@@ -50,12 +50,12 @@ char *strchr(const char *src, char val) {
 }
 
 char *strrchr(const char *src, char val) {
-    char *res = 0;
+    char *res = '\0';
     while (*src) {
         if (*src == val) res = src;
         src++;
     }
-    return !res ? src : res;
+    return res;
 }
 
 char *strcat(const char *src, char *des) {

@@ -49,6 +49,13 @@ typedef enum {
     SEEK_END
 } file_seek;
 
+// 文件属性
+typedef struct {
+    u32 st_ino; //inode
+    u32 st_size; // 大小
+    file_type st_type; // 文件类型
+} stat;
+
 typedef struct {
     u16 limit;
     u32 base;
