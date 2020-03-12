@@ -89,17 +89,13 @@ void u_proc_a() {
     while (1);
 }
 
-void u_proc_b() {
-    void *addr = malloc(63);
-    printf("PPP1:0x%x\n", addr);
-    free(addr);
-    addr = malloc(127);
-    printf("PPP1:0x%x\n", addr);
-    void *addr2 = malloc(36);
-    printf("PPP2:0x%x\n", addr2);
-    free(addr);
-    free(addr2);
-    printf("LAST:0x%x\n", malloc(33));
+void user_fork() {
+    u32 retpid = fork();
+    if (retpid) {
+        printf("\nfather:pid %d, retpid:%d\n", getpid(), retpid);
+    } else {
+        printf("\nchild:pid %d, retpid:%d\n", getpid(), retpid);
+    }
     while (1);
 }
 
@@ -125,7 +121,7 @@ void kernel_init() {
     kprintf("\nread %d res:%s\n",len, buf);
     fs_close(fd);
     thread_start("TA", 15, thread_b, NULL);
-    process_exec(u_proc_a, "PA");
+    process_exec(user_fork, "PA");
     while (1);
 }
 

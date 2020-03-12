@@ -69,6 +69,8 @@ void *kmalloc_page(u32 cnt, u32 *pde);
 
 void *umalloc_page(u32 cnt);
 
+void *get_a_page(u32 *pde , u32 va);
+
 void *get_user_page(u32 va);
 
 void *sync_get_user_page(u32 va);

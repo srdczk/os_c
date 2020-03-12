@@ -11,6 +11,7 @@
 #define SYS_WRITE 1
 #define SYS_MALLOC 2
 #define SYS_FREE 3
+#define SYS_FORK 4
 // 最多 32 个 系统调用
 #define SYSCALL_SIZE 0x20
 
@@ -53,6 +54,10 @@ void *malloc(u32 size);
 u32 sys_free(u32 *arg);
 
 void free(void *ptr);
+
+u32 sys_fork(u32 *arg);
+
+u32 fork();
 
 void syscall(int_frame *tf);
 

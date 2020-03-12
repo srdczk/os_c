@@ -6,12 +6,14 @@
 #include "../include/console.h"
 #include "../include/debug.h"
 #include "../include/string.h"
+#include "../include/fork.h"
 
 static u32 (*syscalls[])(u32 *arg) = {
     sys_getpid,
     sys_write,
     sys_malloc,
-    sys_free
+    sys_free,
+    sys_fork
 };
 
 
@@ -50,6 +52,14 @@ u32 sys_free(u32 *arg) {
 
 void free(void *ptr) {
     _syscall1(SYS_FREE, ptr);
+}
+
+u32 sys_fork(u32 *arg) {
+    return ts_fork();
+}
+
+u32 fork() {
+    return (u32)_syscall0(SYS_FORK);
 }
 
 void syscall(int_frame *tf) {

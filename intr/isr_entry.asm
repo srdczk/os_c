@@ -19,9 +19,9 @@ all_int:
     call int_dispatch
     add esp, 4
     ;中断退出函数, 伪造中断现场的时候使用
-    popa
 [global int_exit]
 int_exit:
+    popa
     pop gs
     pop fs
     pop es

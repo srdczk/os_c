@@ -74,6 +74,7 @@ void thread_init(task_struct *pthread, char *name, u32 priority) {
     pthread->fd_table[2] = 2;
     // 默认根目录下 工作
     pthread->cwd_inode_nr = 0;
+    pthread->parent_pid = -1;
     int i;
     for (i = 3; i < MAX_OPEN_FILE; ++i) {
         pthread->fd_table[i] = -1;

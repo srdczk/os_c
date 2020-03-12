@@ -199,6 +199,10 @@ void *kmalloc_page(u32 cnt, u32 *pde) {
     while (i < cnt) {
         bitmap_set(&kernel_pool.bmap, index++, 1);
         map(base_addr, pde, PG_PRESENT | PG_RW | PG_USER);
+        if (kernel_pde != pde) {
+            u32 pde_id = PDE_INDEX(base_addr);
+            kernel_pde[pde_id] = pde[pde_id];
+        }
         base_addr += PAGE_SIZE;
         i++;
     }
@@ -218,6 +222,13 @@ void *umalloc_page(u32 cnt) {
     }
     sem_up(&mem_sem);
     return (void *)res;
+}
+
+void *get_a_page(u32 *pde , u32 va) {
+    sem_down(&mem_sem);
+    map(va, pde, PG_USER | PG_RW | PG_PRESENT);
+    sem_up(&mem_sem);
+    return (void *)va;
 }
 
 void *get_user_page(u32 va) {

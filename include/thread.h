@@ -29,6 +29,8 @@ typedef struct {
     void *arg;
 } task_stack;
 
+extern int global_pid;
+
 // 任务控制块 TCB PCB
 typedef struct {
     // 指针 -> esp 指向
@@ -54,6 +56,8 @@ typedef struct {
     s32 fd_table[MAX_OPEN_FILE];
     // 工作目录的inode
     u32 cwd_inode_nr;
+    // 父进程的pid
+    int parent_pid;
     // 魔数, 检测栈是否溢出
     u32 stack_magic;
 } task_struct;
