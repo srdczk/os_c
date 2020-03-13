@@ -19,7 +19,9 @@ void buffer_init(io_buffer *buffer);
 
 u32 next_pos(u32 pos);
 
-void buffer_getchar(io_buffer *buffer);
+char buffer_getchar(io_buffer *buffer);
 
 void buffer_putchar(io_buffer *buffer, char c);
+
+bool buffer_full(io_buffer *buffer);
 

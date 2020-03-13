@@ -12,11 +12,12 @@ u32 next_pos(u32 pos) {
     return (pos + 1) % BUFFER_SIZE;
 }
 
-void buffer_getchar(io_buffer *buffer) {
+char buffer_getchar(io_buffer *buffer) {
     sem_down(&buffer->y);
-    console_putc(buffer->buff[buffer->tail], RED);
+    char res = buffer->buff[buffer->tail];
     buffer->tail = next_pos(buffer->tail);
     sem_up(&buffer->x);
+    return res;
 }
 
 void buffer_putchar(io_buffer *buffer, char c) {
@@ -27,3 +28,8 @@ void buffer_putchar(io_buffer *buffer, char c) {
 
     sem_up(&buffer->y);
 }
+
+bool buffer_full(io_buffer *buffer) {
+    return (bool) (next_pos(buffer->head) == buffer->tail);
+}
+

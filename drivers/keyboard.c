@@ -142,10 +142,12 @@ void keyboard_handler(u8 code) {
       else shift = 0;
 
       u8 index = (handle_code & 0xff);
-      char put;
-      if (put = keymap[index][shift]) {
-//          buffer_putchar(&kb_buffer, put);
-            console_putc(put, WHITE);
+      char put = keymap[index][shift];
+
+      if (ctrl_status && (put == 'l' || put == 'u')) put -= 'a';
+
+      if (!buffer_full(&kb_buffer)) {
+          buffer_putchar(&kb_buffer, put);
       }
 
       if (!(handle_code ^ ctrl_l_make) || !(handle_code ^ ctrl_r_make)) ctrl_status = 1;

@@ -20,6 +20,8 @@ extern partition *cur_part;
 
 int path_depth(char *pathname);
 
+char *path_parse(char *pathname, char *name_store);
+
 void filesys_init();
 
 int fs_open(const char *pathname, u8 flag);

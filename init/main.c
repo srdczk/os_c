@@ -13,6 +13,7 @@
 #include "../include/fs.h"
 #include "../include/process.h"
 #include "../include/thread.h"
+#include "../include/shell.h"
 // 设置临时页表
 
 #define STACK_SIZE 0x1000
@@ -92,11 +93,10 @@ void u_proc_a() {
 void user_fork() {
     u32 retpid = fork();
     if (retpid) {
-        printf("\nfather:pid %d, retpid:%d\n", getpid(), retpid);
+        while (1);
     } else {
-        printf("\nchild:pid %d, retpid:%d\n", getpid(), retpid);
+        shell();
     }
-    while (1);
 }
 
 
@@ -108,19 +108,13 @@ void kernel_init() {
     idt_init();
     pmm_init();
     kernel_thread_init();
+    kbuffer_init();
     ide_init();
     filesys_init();
     enable_int();
-    int fd = fs_open("/file1", O_CREAT | O_RDWR);
-    kprintf("\n create res:%d \n", fd);
-    int res = fs_write(fd, "hello!\n", 7);
-    kprintf("\nwrite res:%d\n", res);
-    char buf[10] = {0};
-    fs_lseek(fd, 0, SEEK_SET);
-    int len = fs_read(fd, buf, 7);
-    kprintf("\nread %d res:%s\n",len, buf);
-    fs_close(fd);
-    thread_start("TA", 15, thread_b, NULL);
+
+    mil_sleep(1000);
+    console_clear();
     process_exec(user_fork, "PA");
     while (1);
 }

@@ -9,6 +9,7 @@
 #include "../include/pmm.h"
 #include "../include/debug.h"
 #include "../include/console.h"
+#include "../include/keyboard.h"
 
 // 默认操作分区
 partition *cur_part;
@@ -161,7 +162,7 @@ static void partition_format(partition *part) {
 }
 
 // 解析路径
-static char *path_parse(char *pathname, char *name_store) {
+char *path_parse(char *pathname, char *name_store) {
     if (pathname[0] == '/') {
         // 跳过 ‘/’
         while (*(++pathname) == '/');
@@ -363,7 +364,26 @@ int fs_write(u32 fd, const void *buf, u32 cnt) {
 }
 
 int fs_read(u32 fd, void *buf, u32 cnt) {
-    return file_read(&file_table[fd_local2global(fd)], buf, cnt);
+    if (fd == stdout_no || fd == stderr_no || !cnt) {
+        kprintf("fd error!\n");
+        kprintf("%d\n", fd);
+        PANIC("NIAMSILE");
+    } else if (fd == stdin_no) {
+        // 若果 标准输入, 读入
+        if (cnt > BUFFER_SIZE) {
+            kprintf("too large \n");
+        } else {
+            u32 i = 0;
+            char *res = (char *)buf;
+            // 阻塞方法
+            while (i < cnt) {
+                *res = buffer_getchar(&kb_buffer);
+                i++;
+                res++;
+            }
+            return !i ? -1 : i;
+        }
+    } else return file_read(&file_table[fd_local2global(fd)], buf, cnt);
 }
 
 int fs_lseek(u32 fd, int offset, u8 seek) {
