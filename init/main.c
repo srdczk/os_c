@@ -112,7 +112,13 @@ void kernel_init() {
     ide_init();
     filesys_init();
     enable_int();
-
+    kprintf("\
+\n    _ __ ___  _   _  ___  ___  \
+\n   | '_ ` _ \\| | | |/ _ \\/ __| \
+\n   | | | | | | |_| | (_) \\__ \\ \
+\n   |_| |_| |_|\\__, |\\___/|___/ \
+\n               __/ |           \
+\n              |___/          \n\n");
     mil_sleep(1000);
     console_clear();
     process_exec(user_fork, "PA");
