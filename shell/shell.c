@@ -6,6 +6,7 @@
 #include "../include/syscall.h"
 #include "../include/string.h"
 #include "../include/fs.h"
+#include "../include/clock.h"
 
 // 最大支持输入 64 大小的命令
 #define CMD_LEN 0x40
@@ -328,6 +329,24 @@ void shell() {
             shell_rmdir(ac, av);
         } else if (!strcmp("rm", av[0])) {
             rm(ac, av);
-        } else printf("not support cmd!\n");
+        } else {
+            int pid = fork();
+            if (!pid) {
+                make_abs_path(av[0], res_path);
+                av[0] = res_path;
+                stat f_stat;
+                memset(&f_stat, '\0', sizeof(stat));
+                if (file_stat(av[0], &f_stat) == -1) {
+                    printf("program Not exist!\n");
+                } else {
+                    exec(av[0], av);
+                }
+                while (1);
+            } else {
+                // 父进程一般先被调用, 让其延迟
+                int delay = 200000000;
+                while (delay--);
+            }
+        }
     }
 }

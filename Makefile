@@ -29,6 +29,9 @@ init_disk:
 
 fdisk:
 	fdisk disk.img < fdisk.txt
+	
+user_prog:
+	ld -e umain -m elf_i386 -nostdlib disk_pro.o -o disk_pro
 
 clean:
 	rm -rf $(ASM_OBJS) $(C_OBJS) zl_kernel *.img

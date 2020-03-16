@@ -29,6 +29,7 @@
 #define SYS_READDIR 18
 #define SYS_REWINDDIR 19
 #define SYS_STAT 20
+#define SYS_EXEC 21
 // 最多 32 个 系统调用
 #define SYSCALL_SIZE 0x20
 
@@ -164,6 +165,10 @@ void rewinddir(dir *d);
 u32 sys_stat(u32 *arg);
 
 int file_stat(const char *path, stat *s);
+
+u32 sys_exec(u32 *arg);
+
+int exec(char *name, char **av);
 
 void syscall(int_frame *tf);
 

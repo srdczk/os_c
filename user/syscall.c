@@ -9,6 +9,7 @@
 #include "../include/string.h"
 #include "../include/fork.h"
 #include "../include/fs.h"
+#include "../include/exec.h"
 
 static u32 (*syscalls[])(u32 *arg) = {
     sys_getpid,
@@ -31,7 +32,8 @@ static u32 (*syscalls[])(u32 *arg) = {
     sys_rmdir,
     sys_readdir,
     sys_rewinddir,
-    sys_stat
+    sys_stat,
+    sys_exec
 };
 
 u32 sys_getpid(u32 *arg) {
@@ -226,6 +228,16 @@ u32 sys_stat(u32 *arg) {
     const char *path = (const char *)arg[0];
     stat *buf = (stat *)arg[1];
     return (u32)fs_stat(path, buf);
+}
+
+u32 sys_exec(u32 *arg) {
+    char *name = (char *) arg[0];
+    char **av = (char **)arg[1];
+    return (u32)kernel_exec(name, av);
+}
+
+int exec(char *name, char **av) {
+    return (int) _syscall2(SYS_EXEC, name, av);
 }
 
 int file_stat(const char *path, stat *s) {
